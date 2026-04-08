@@ -1087,6 +1087,37 @@ if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.ser
 
 /* INIT */
 _show('home');
+  // PWA 뒤로가기 버튼 처리 (Android 스마트폰에서 앱이 종료되지 않게)
+let isAppReady = false;
+
+window.addEventListener('load', function() {
+    // 앱이 처음 로드될 때 history에 더미 상태 하나 추가 (뒤로가기 방지)
+    history.pushState({ page: 'home' }, '', '');
+    isAppReady = true;
+    
+    console.log('기도수첩 앱: 뒤로가기 처리 준비 완료');
+});
+
+// 뒤로가기 버튼(또는 브라우저 뒤로가기) 누를 때 실행
+window.addEventListener('popstate', function(event) {
+    if (!isAppReady) return;
+    
+    // 여기서 앱 내부에서 "이전 화면으로 돌아가기" 로직을 처리
+    // 예: 모달/메뉴가 열려 있으면 닫기, 아니면 홈으로 가거나 앱 유지
+    
+    console.log('뒤로가기 버튼 눌림');
+    
+    // 간단한 해결: 모달이나 사이드 메뉴가 있으면 닫는 함수 호출
+    // (당신 앱에 모달이 있다면 아래처럼 closeModal() 같은 함수를 호출)
+    if (typeof closeCurrentModal === 'function') {
+        closeCurrentModal();  // ← 당신 앱에 맞는 모달 닫기 함수 이름으로 바꾸세요
+        history.pushState({ page: 'home' }, '', '');  // 다시 history 쌓기
+        return;
+    }
+    
+    // 기본적으로 홈 화면 유지하면서 history 다시 쌓기 (앱 종료 방지)
+    history.pushState({ page: 'home' }, '', '');
+});
 </script>
 </body>
 </html>
