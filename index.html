@@ -1087,37 +1087,72 @@ if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.ser
 
 /* INIT */
 _show('home');
-  // PWA 뒤로가기 버튼 처리 (Android 스마트폰에서 앱이 종료되지 않게)
-let isAppReady = false;
 
-window.addEventListener('load', function() {
-    // 앱이 처음 로드될 때 history에 더미 상태 하나 추가 (뒤로가기 방지)
-    history.pushState({ page: 'home' }, '', '');
-    isAppReady = true;
-    
-    console.log('기도수첩 앱: 뒤로가기 처리 준비 완료');
-});
+// ==================== 기도수첩 PWA 뒤로가기 버튼 개선 ====================
+// Android 스마트폰에서 뒤로가기 버튼 누를 때 앱이 종료되지 않고 이전 화면으로 돌아가게 합니다.
 
-// 뒤로가기 버튼(또는 브라우저 뒤로가기) 누를 때 실행
-window.addEventListener('popstate', function(event) {
-    if (!isAppReady) return;
-    
-    // 여기서 앱 내부에서 "이전 화면으로 돌아가기" 로직을 처리
-    // 예: 모달/메뉴가 열려 있으면 닫기, 아니면 홈으로 가거나 앱 유지
-    
-    console.log('뒤로가기 버튼 눌림');
-    
-    // 간단한 해결: 모달이나 사이드 메뉴가 있으면 닫는 함수 호출
-    // (당신 앱에 모달이 있다면 아래처럼 closeModal() 같은 함수를 호출)
-    if (typeof closeCurrentModal === 'function') {
-        closeCurrentModal();  // ← 당신 앱에 맞는 모달 닫기 함수 이름으로 바꾸세요
-        history.pushState({ page: 'home' }, '', '');  // 다시 history 쌓기
+let historyStack = 0;   // 현재 앱 내부 화면 깊이 추적
+const isStandalone = () => {
+    return window.matchMedia('(display-mode: standalone)').matches || 
+           window.navigator.standalone === true;
+};
+
+function handleBackButton() {
+    if (!isStandalone()) return;   // 브라우저에서 열었을 때는 정상 동작
+
+    console.log('뒤로가기 버튼 감지됨 (PWA 모드)');
+
+    // 모달, 사이드메뉴, 기도 모드 화면 등이 열려 있다면 먼저 닫기
+    // (당신 앱에 맞는 함수 이름으로 아래 부분을 수정하세요)
+    if (typeof closeCurrentModal === 'function' && document.querySelector('.modal.show, .side-menu.open, .prayer-mode')) {
+        closeCurrentModal();        // ← 클로드가 만든 모달 닫기 함수 이름 (없으면 아래 주석 처리)
+        historyStack = Math.max(0, historyStack - 1);
         return;
     }
-    
-    // 기본적으로 홈 화면 유지하면서 history 다시 쌓기 (앱 종료 방지)
-    history.pushState({ page: 'home' }, '', '');
+
+    // 메인 화면에서 뒤로가기 누르면 "한 번 더 누르면 종료" 알림 (선택사항, 편안하게 사용 가능)
+    if (historyStack <= 1) {
+        if (confirm('기도수첩을 종료하시겠습니까?')) {
+            window.close();         // 또는 history.back() 대신 앱 종료 시도
+        }
+        return;
+    }
+
+    // 일반적인 경우: 이전 화면으로 이동
+    historyStack = Math.max(0, historyStack - 1);
+    window.history.back();
+}
+
+// 앱 로드 시 초기 history 상태 추가 (앱 종료 방지 핵심)
+window.addEventListener('load', () => {
+    if (!isStandalone()) return;
+
+    // 초기 상태 하나 추가
+    window.history.pushState({ page: 'home' }, '', '');
+    historyStack = 1;
+
+    console.log('기도수첩: 뒤로가기 처리 준비 완료 (PWA)');
 });
+
+// 뒤로가기 버튼(또는 브라우저 뒤로가기) 이벤트 처리
+window.addEventListener('popstate', (event) => {
+    if (!isStandalone()) return;
+
+    handleBackButton();
+
+    // 다시 history를 쌓아서 다음 뒤로가기도 처리할 수 있게 함
+    if (historyStack > 0) {
+        window.history.pushState({ page: 'internal' }, '', '');
+    }
+});
+
+// 메뉴/모달을 열 때마다 history를 하나 더 쌓기 (중요!)
+// 예: 그룹 추가 버튼, 기도 모드 버튼, 기도 제목 클릭 등에서 아래 함수 호출
+window.openInternalScreen = function() {
+    window.history.pushState({ page: 'screen' }, '', '');
+    historyStack++;
+    console.log('내부 화면 열림, historyStack:', historyStack);
+};  
 </script>
 </body>
 </html>
