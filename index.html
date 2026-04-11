@@ -314,12 +314,13 @@ body{font-family:var(--sans);background:#e5e7eb;color:var(--g900);min-height:100
   </div>
   <div class="scroll">
     <div class="fg"><label class="fl">그룹 *</label><select id="f-group" class="fi fi-sel"></select></div>
+    <div class="fg"><label class="fl">소속</label><input id="f-belong" class="fi" placeholder="예: 1목장, 3구역, 청년 2부"></div>
     <div class="fg"><label class="fl">이름 (기도 대상자) *</label><input id="f-name" class="fi" placeholder="예: 홍길동 집사님"></div>
     <div class="fg"><label class="fl">기도 제목 *</label><input id="f-subject" class="fi" placeholder="예: 건강 회복, 취업, 가정 평화"></div>
     <div class="fg">
-      <label class="fl">기도 내용 항목</label>
+      <label class="fl">기도 내용 항목 <span id="items-count-label" style="font-weight:400;color:var(--g400)"></span></label>
       <div id="items-container"></div>
-      <button class="btn-add-item" onclick="addFormItem()">＋ 기도 항목 추가</button>
+      <button class="btn-add-item" id="btn-add-item" onclick="addFormItem()">＋ 기도 항목 추가</button>
     </div>
     <div class="fg"><label class="fl">날짜</label><input type="date" id="f-date" class="fi"></div>
     <button class="btn btn-p" id="btn-save-form">🙏 기도제목 추가</button>
@@ -799,6 +800,7 @@ function renderDetail(){
   const ansCount=p.items.filter(i=>i.status==='응답됨').length;
   document.getElementById('detail-scroll').innerHTML=
     `<div class="dc"><div class="dl">그룹</div><div class="dv">${getEm(p.group)} ${esc(p.group)}</div></div>
+     ${p.belong?`<div class="dc"><div class="dl">소속</div><div class="dv">${esc(p.belong)}</div></div>`:''}
      <div class="dc"><div class="dl">기도 시작일</div><div class="dv">📅 ${fdt(p.date)}</div></div>
      <div class="dc"><div class="dl">기도 제목</div><div class="dv" style="font-weight:700">${esc(p.subject)}</div></div>
      <div style="padding:2px 0">
@@ -866,6 +868,7 @@ let formItems=[];
 function openAdd(){
   curId=null;formItems=[{id:uid(),text:''}];
   populateGroupSelect(curGroup);
+  document.getElementById('f-belong').value='';
   document.getElementById('f-name').value='';
   document.getElementById('f-subject').value='';
   document.getElementById('f-date').value=tod();
@@ -878,6 +881,7 @@ function openEdit(){
   formItems=p.items.map(i=>({id:i.id,text:i.text||''}));
   if(!formItems.length)formItems=[{id:uid(),text:''}];
   populateGroupSelect(p.group);
+  document.getElementById('f-belong').value=p.belong||'';
   document.getElementById('f-name').value=p.name||'';
   document.getElementById('f-subject').value=p.subject||'';
   document.getElementById('f-date').value=p.date||tod();
@@ -890,7 +894,11 @@ function populateGroupSelect(sel){
   el.innerHTML=groups.map(g=>`<option value="${esc(g.name)}">${g.em} ${esc(g.name)}</option>`).join('');
   if(sel)el.value=sel;
 }
+const MAX_ITEMS=5;
 function renderFormItems(){
+  const atMax=formItems.length>=MAX_ITEMS;
+  document.getElementById('items-count-label').textContent=`(${formItems.length}/${MAX_ITEMS})`;
+  document.getElementById('btn-add-item').style.display=atMax?'none':'flex';
   document.getElementById('items-container').innerHTML=formItems.map((item,i)=>
     `<div class="item-row" data-idx="${i}">
       <div class="item-num">${i+1}</div>
@@ -900,6 +908,7 @@ function renderFormItems(){
 }
 function syncFormItems(){document.querySelectorAll('#items-container .item-text').forEach((ta,i)=>{if(formItems[i])formItems[i].text=ta.value;});}
 function addFormItem(){
+  if(formItems.length>=MAX_ITEMS){toast(`기도 항목은 최대 ${MAX_ITEMS}개까지 입력할 수 있습니다`);return;}
   syncFormItems();formItems.push({id:uid(),text:''});renderFormItems();
   const tas=document.querySelectorAll('#items-container .item-text');
   if(tas.length)tas[tas.length-1].focus();
@@ -915,11 +924,12 @@ document.getElementById('btn-save-form').onclick=()=>{
   if(!name){alert('이름을 입력해주세요');return;}
   if(!subject){alert('기도제목을 입력해주세요');return;}
   const groupName=document.getElementById('f-group').value;
+  const belong=document.getElementById('f-belong').value.trim();
   const date=document.getElementById('f-date').value||tod();
   if(curId){
     const p=prayers.find(x=>x.id===curId);
     if(p){
-      p.group=groupName;p.name=name;p.subject=subject;p.date=date;
+      p.group=groupName;p.belong=belong;p.name=name;p.subject=subject;p.date=date;
       p.items=formItems.map((fi,i)=>{
         const ex=p.items[i];
         return{id:fi.id||(ex&&ex.id)||uid(),text:fi.text,
@@ -928,7 +938,7 @@ document.getElementById('btn-save-form').onclick=()=>{
     }
     save();toast('✅ 저장되었습니다');back();
   }else{
-    prayers.unshift({id:uid(),group:groupName,name,subject,date,
+    prayers.unshift({id:uid(),group:groupName,belong,name,subject,date,
       items:formItems.map(fi=>({id:fi.id||uid(),text:fi.text,status:'미응답',responseDate:'',responseMemo:''}))});
     save();toast('✅ 기도제목이 추가되었습니다');back();
   }
