@@ -896,9 +896,7 @@ function populateGroupSelect(sel){
 }
 const MAX_ITEMS=5;
 function renderFormItems(){
-  const atMax=formItems.length>=MAX_ITEMS;
   document.getElementById('items-count-label').textContent=`(${formItems.length}/${MAX_ITEMS})`;
-  document.getElementById('btn-add-item').style.display=atMax?'none':'flex';
   document.getElementById('items-container').innerHTML=formItems.map((item,i)=>
     `<div class="item-row" data-idx="${i}">
       <div class="item-num">${i+1}</div>
@@ -1035,9 +1033,12 @@ function openImport(){document.getElementById('import-modal').style.display='fle
 function closeImport(){document.getElementById('import-modal').style.display='none';}
 
 function downloadTemplate(){
-  const hdr='그룹,이름,기도제목,날짜,항목1,항목2,항목3';
+  const hdr='그룹,소속,이름,기도제목,날짜,항목1,항목2,항목3,항목4,항목5';
   const g0=groups[0]?.name||'그룹1';
-  const rows=[`${g0},홍길동,건강 회복,${tod()},허리 통증 기도합니다.,,`,`${g0},김영희,취업 및 진로,${tod()},직장을 찾고 있습니다.,면접이 잘 되도록.,`];
+  const rows=[
+    `${g0},1목장,홍길동,건강 회복,${tod()},허리 통증 기도합니다.,수술이 잘 되도록,빠른 회복을 위해,,`,
+    `${g0},청년부,김영희,취업 및 진로,${tod()},직장을 찾고 있습니다.,면접이 잘 되도록,,,`,
+  ];
   dlCSV(hdr+'\n'+rows.join('\n'),'기도수첩_입력양식.csv');toast('📋 양식 파일 다운로드');
 }
 function exportAll(){
@@ -1073,11 +1074,11 @@ document.getElementById('file-in').onchange=function(){
       let items;
       if(obj['항목들(JSON)']){try{items=JSON.parse(obj['항목들(JSON)']);}catch{}}
       if(!items||!items.length){
-        const texts=[obj['항목1'],obj['항목2'],obj['항목3'],obj['내용']].filter(Boolean);
+        const texts=[obj['항목1'],obj['항목2'],obj['항목3'],obj['항목4'],obj['항목5'],obj['내용']].filter(Boolean);
         items=texts.length?texts.map(t=>({id:uid(),text:t,status:'미응답',responseDate:'',responseMemo:''}))
           :[{id:uid(),text:'',status:obj['상태']||'미응답',responseDate:'',responseMemo:''}];
       }
-      imported.push({id:uid(),group:grp,name:obj['이름']||'이름없음',subject:obj['기도제목']||'',date:obj['날짜']||tod(),items});
+      imported.push({id:uid(),group:grp,belong:obj['소속']||'',name:obj['이름']||'이름없음',subject:obj['기도제목']||'',date:obj['날짜']||tod(),items});
     }
     return imported;
   }
