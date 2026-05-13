@@ -122,7 +122,8 @@ body{font-family:var(--sans);background:#e5e7eb;color:var(--g900);min-height:100
 .arch-ban{background:linear-gradient(135deg,#dcfce7,#d1fae5);border:1px solid #86efac;border-radius:16px;padding:18px;text-align:center;margin-bottom:16px}
 .arch-n{font-family:var(--serif);font-size:38px;font-weight:900;color:var(--green);line-height:1}
 .arch-s{font-size:13px;color:#065f46;margin-top:5px;font-weight:600}
-.ge-item{background:var(--g50);border-radius:14px;padding:10px 10px 10px 6px;margin-bottom:10px;border:1.5px solid var(--g200);display:flex;align-items:center;gap:8px;transition:box-shadow .2s,border-color .2s;user-select:none}
+.ge-item{background:var(--g50);border-radius:14px;padding:10px 10px 10px 6px;margin-bottom:10px;border:1.5px solid var(--g200);display:flex;align-items:center;gap:8px;transition:box-shadow .2s,border-color .2s,background .15s;user-select:none}
+.ge-item.ge-selected{background:#eef2ff;border-color:var(--v)}
 .ge-item.ge-dragging{box-shadow:0 8px 24px rgba(79,70,229,.3);border-color:var(--v);background:#eef2ff;transform:scale(1.01)}
 .ge-left{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0}
 .ge-ab{width:34px;height:34px;border:none;border-radius:9px;font-size:14px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:var(--sans)}
@@ -140,6 +141,15 @@ body{font-family:var(--sans);background:#e5e7eb;color:var(--g900);min-height:100
 .ge-dt{font-size:11px;color:var(--g400)}
 .ge-right{display:flex;flex-direction:column;gap:5px;flex-shrink:0}
 .ge-tip{font-size:12px;color:var(--g400);margin-bottom:12px;padding:8px 12px;background:var(--g100);border-radius:10px;font-weight:500}
+.ge-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.ge-sel-all{background:var(--g100);border:1.5px solid var(--g200);color:var(--g600);border-radius:10px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);white-space:nowrap}
+.ge-sel-all.on{background:#eef2ff;border-color:var(--v);color:var(--v)}
+.ge-sel-all:active{opacity:.75}
+.ge-del-sel{background:var(--redlt);border:1.5px solid #fca5a5;color:var(--red);border-radius:10px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);white-space:nowrap}
+.ge-del-sel:active{background:#fecaca}
+.ge-tip-inline{font-size:12px;color:var(--g400);font-weight:500;padding:4px 0}
+.ge-chk{font-size:20px;cursor:pointer;flex-shrink:0;width:28px;text-align:center;color:var(--g400);line-height:1;padding:4px 0;user-select:none}
+.ge-item.ge-selected .ge-chk{color:var(--v)}
 .ge-info{flex:1;cursor:pointer;min-width:0}.ge-info:active{opacity:.7}
 .ge-btns{display:flex;flex-direction:column;gap:5px;flex-shrink:0}
 .ge-edit{background:#eef2ff;color:var(--v);border:none;border-radius:9px;padding:8px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans)}
@@ -605,7 +615,7 @@ function recPD(id,e){
   p.prayDates.push(tod());sv();
   toast('🙏 기도 기록! (누적 '+p.prayDates.length+'회)');
   if(cs==='group')rGroup();
-  if(cs==='groupedit')rGEdit();
+  if(cs==='groupedit'){geSelected.clear();rGEdit();}
   if(cs==='detail')rDetail();
 }
 
@@ -680,57 +690,117 @@ document.getElementById('btn-save').onclick=()=>{
 };
 
 /* ── 그룹 편집 ── */
+let geSelected = new Set(); // 선택된 기도제목 ID
+
 function rGEdit(){
   document.getElementById('gedr-hdr').style.background=gBG(cg);
   document.getElementById('gedr-ttl').textContent=gEM(cg)+' '+cg+' 관리';
   const gp=prayers.filter(p=>p.group===cg);
   const el=document.getElementById('gedr-list');
+
   if(!gp.length){
+    geSelected.clear();
     el.innerHTML='<div class="empty"><div class="ei">'+gEM(cg)+'</div><div class="et">기도제목이 없습니다</div><div class="es">+ 추가 버튼으로 등록하세요</div></div>';
     return;
   }
-  el.innerHTML='<div class="ge-tip">▲▼ 버튼 또는 카드를 1초 누른 채 위아래로 드래그</div>'
-    +gp.map((p,i)=>{
-      const st=ST[p.status]||ST['미응답'];
-      const first=(i===0), last=(i===gp.length-1);
-      return '<div class="ge-item" id="gei-'+p.id+'" data-id="'+p.id+'">'
-        +'<div class="ge-left">'
-        +'<button class="ge-ab ge-up" data-id="'+p.id+'" '+(first?'disabled':'')+'>▲</button>'
-        +'<div class="ge-handle">≡</div>'
-        +'<button class="ge-ab ge-dn" data-id="'+p.id+'" '+(last?'disabled':'')+'>▼</button>'
-        +'</div>'
-        +'<div class="ge-mid">'
-        +'<div class="ge-mid-top"><span class="badge" style="background:'+st.bg+';color:'+st.col+'">'+st.em+' '+p.status+'</span><span class="ge-nm">'+esc(p.name)+'</span></div>'
-        +'<div class="ge-sj">'+esc(p.subject)+'</div>'
-        +'<div class="ge-dt">📅 '+fdt(p.date)+'</div>'
-        +'</div>'
-        +'<div class="ge-right">'
-        +'<button class="ge-edit" data-id="'+p.id+'">✏️</button>'
-        +'<button class="ge-del" data-id="'+p.id+'" data-nm="'+esc(p.name)+'">🗑️</button>'
-        +'</div>'
-        +'</div>';
-    }).join('');
 
-  // 이벤트 위임으로 모든 버튼 처리
-  el.onclick=null;
-  el.addEventListener('click', geEditClick, {once:true});
-  el.addEventListener('click', geEditClick);
+  // 삭제된 항목이 선택 목록에 남아있으면 제거
+  const validIds = new Set(gp.map(p=>p.id));
+  geSelected.forEach(id=>{ if(!validIds.has(id)) geSelected.delete(id); });
+
+  const allSelected = gp.length > 0 && gp.every(p=>geSelected.has(p.id));
+  const selCount = geSelected.size;
+
+  // 상단 툴바
+  const toolbar = '<div class="ge-toolbar">'
+    +'<button class="ge-sel-all '+(allSelected?'on':'')+'" id="btn-selall">'
+    +(allSelected?'☑ 전체 해제':'☐ 전체 선택')
+    +'</button>'
+    +(selCount>0
+      ? '<button class="ge-del-sel" id="btn-delsel">🗑️ 선택 삭제 ('+selCount+'개)</button>'
+      : '<div class="ge-tip-inline">▲▼ 또는 길게 눌러 순서 변경</div>'
+    )
+    +'</div>';
+
+  el.innerHTML = toolbar + gp.map((p,i)=>{
+    const st=ST[p.status]||ST['미응답'];
+    const first=(i===0), last=(i===gp.length-1);
+    const isSel=geSelected.has(p.id);
+    return '<div class="ge-item'+(isSel?' ge-selected':'')+'" id="gei-'+p.id+'" data-id="'+p.id+'">'
+      +'<div class="ge-chk" data-id="'+p.id+'">'+(isSel?'☑':'☐')+'</div>'
+      +'<div class="ge-left">'
+      +'<button class="ge-ab ge-up" data-id="'+p.id+'" '+(first?'disabled':'')+'>▲</button>'
+      +'<div class="ge-handle">≡</div>'
+      +'<button class="ge-ab ge-dn" data-id="'+p.id+'" '+(last?'disabled':'')+'>▼</button>'
+      +'</div>'
+      +'<div class="ge-mid">'
+      +'<div class="ge-mid-top"><span class="badge" style="background:'+st.bg+';color:'+st.col+'">'+st.em+' '+p.status+'</span><span class="ge-nm">'+esc(p.name)+'</span></div>'
+      +'<div class="ge-sj">'+esc(p.subject)+'</div>'
+      +'<div class="ge-dt">📅 '+fdt(p.date)+'</div>'
+      +'</div>'
+      +'<div class="ge-right">'
+      +'<button class="ge-edit" data-id="'+p.id+'">✏️</button>'
+      +'<button class="ge-del" data-id="'+p.id+'" data-nm="'+esc(p.name)+'">🗑️</button>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+
+  // 이벤트 위임 — onclick으로 단일 등록
+  el.onclick = geEditClick;
+
+  // 툴바 버튼
+  const btnAll = document.getElementById('btn-selall');
+  const btnDel = document.getElementById('btn-delsel');
+  if(btnAll) btnAll.onclick = e=>{ e.stopPropagation(); toggleSelAll(gp); };
+  if(btnDel) btnDel.onclick = e=>{ e.stopPropagation(); delSelected(gp); };
 
   // 터치 드래그 설정
   gp.forEach(p=>setupDrag(p.id));
 }
 
+function toggleSelAll(gp){
+  const allSel = gp.every(p=>geSelected.has(p.id));
+  if(allSel) gp.forEach(p=>geSelected.delete(p.id));
+  else       gp.forEach(p=>geSelected.add(p.id));
+  rGEdit();
+}
+
+function delSelected(gp){
+  const selIds=[...geSelected].filter(id=>gp.find(p=>p.id===id));
+  if(!selIds.length) return;
+  const names=selIds.map(id=>{ const p=prayers.find(x=>x.id===id); return p?p.name:''; }).filter(Boolean);
+  if(!confirm(names.join(', ')+'\n\n위 '+selIds.length+'개의 기도제목을 삭제하시겠습니까?')) return;
+  prayers=prayers.filter(p=>!selIds.includes(p.id));
+  geSelected.clear();
+  sv(); toast('🗑️ '+selIds.length+'개 삭제되었습니다'); rGEdit();
+}
+
 function geEditClick(e){
-  const upBtn=e.target.closest('.ge-up');
-  const dnBtn=e.target.closest('.ge-dn');
+  const chk   = e.target.closest('.ge-chk');
+  const upBtn = e.target.closest('.ge-up');
+  const dnBtn = e.target.closest('.ge-dn');
   const editBtn=e.target.closest('.ge-edit');
-  const delBtn=e.target.closest('.ge-del');
-  const mid=e.target.closest('.ge-mid');
+  const delBtn = e.target.closest('.ge-del');
+  const mid   = e.target.closest('.ge-mid');
+
+  if(chk){
+    e.stopPropagation();
+    const id=chk.dataset.id;
+    if(geSelected.has(id)) geSelected.delete(id); else geSelected.add(id);
+    rGEdit(); return;
+  }
   if(upBtn)  { e.stopPropagation(); moveP(upBtn.dataset.id,-1); return; }
   if(dnBtn)  { e.stopPropagation(); moveP(dnBtn.dataset.id,1);  return; }
   if(editBtn){ e.stopPropagation(); openEditD(editBtn.dataset.id); return; }
-  if(delBtn) { e.stopPropagation(); const nm=delBtn.dataset.nm; const id=delBtn.dataset.id; if(!confirm(nm+'의 기도제목을 삭제하시겠습니까?'))return; prayers=prayers.filter(x=>x.id!==id); sv(); toast('🗑️ 삭제'); rGEdit(); return; }
-  if(mid)    { openDet(mid.closest('.ge-item').dataset.id); }
+  if(delBtn){
+    e.stopPropagation();
+    const nm=delBtn.dataset.nm, id=delBtn.dataset.id;
+    if(!confirm(nm+'의 기도제목을 삭제하시겠습니까?')) return;
+    prayers=prayers.filter(x=>x.id!==id);
+    geSelected.delete(id);
+    sv(); toast('🗑️ 삭제'); rGEdit(); return;
+  }
+  if(mid){ openDet(mid.closest('.ge-item').dataset.id); }
 }
 
 let _lpTimer=null, _lpId=null, _lpY0=0, _lpDragging=false;
