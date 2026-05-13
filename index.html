@@ -98,6 +98,9 @@ body{font-family:var(--sans);background:#e5e7eb;color:var(--g900);min-height:100
 .fi{width:100%;padding:11px 12px;border:2px solid var(--g200);border-radius:11px;font-size:15px;font-family:var(--sans);color:var(--g900);background:#fff;outline:none}
 .fi:focus{border-color:var(--v);box-shadow:0 0 0 3px rgba(79,70,229,.1)}
 .fi-ta{min-height:100px;resize:vertical;line-height:1.6}
+.items-box{background:var(--g50);border:1.5px solid var(--g200);border-radius:14px;padding:14px 14px 6px;margin-bottom:15px}
+.items-hdr{font-family:var(--serif);font-size:14px;font-weight:700;color:var(--g600);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.items-hdr::before{content:'🙏';font-size:16px}
 .fi-sel{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234b5563' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px;cursor:pointer}
 .btn{width:100%;padding:13px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;border:none;font-family:var(--sans);margin-bottom:9px}
 .btn-p{background:var(--ink);color:#fff}.btn-p:active{background:var(--ink2)}
@@ -140,7 +143,11 @@ body{font-family:var(--sans);background:#e5e7eb;color:var(--g900);min-height:100
 .ge-sj{font-size:13px;color:var(--g600);margin-bottom:2px}
 .ge-dt{font-size:11px;color:var(--g400)}
 .ge-right{display:flex;flex-direction:column;gap:5px;flex-shrink:0}
-.ge-tip{font-size:12px;color:var(--g400);margin-bottom:12px;padding:8px 12px;background:var(--g100);border-radius:10px;font-weight:500}
+.dv-item{display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--g200)}
+.dv-item:last-child{border-bottom:none}
+.dv-inum{background:var(--v);color:#fff;font-size:11px;font-weight:700;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.pc-item{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;line-height:1.55}
+.pc-inum{background:rgba(255,255,255,.18);color:#fff;font-size:11px;font-weight:700;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
 .ge-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .ge-sel-all{background:var(--g100);border:1.5px solid var(--g200);color:var(--g600);border-radius:10px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);white-space:nowrap}
 .ge-sel-all.on{background:#eef2ff;border-color:var(--v);color:var(--v)}
@@ -303,10 +310,18 @@ body{font-family:var(--sans);background:#e5e7eb;color:var(--g900);min-height:100
   </div>
   <div class="scroll">
     <div class="fg"><label class="fl">그룹 *</label><select id="f-group" class="fi fi-sel"></select></div>
+    <div class="fg"><label class="fl">소속</label><input id="f-affil" class="fi" placeholder="예: 1목장, 청년부, 3학년 2반"></div>
     <div class="fg"><label class="fl">이름 *</label><input id="f-name" class="fi" placeholder="예: 홍길동 집사님"></div>
     <div class="fg"><label class="fl">기도 제목 *</label><input id="f-subject" class="fi" placeholder="예: 건강 회복, 취업"></div>
-    <div class="fg"><label class="fl">상세 내용</label><textarea id="f-content" class="fi fi-ta" placeholder="구체적인 기도 내용..."></textarea></div>
     <div class="fg"><label class="fl">날짜</label><input type="date" id="f-date" class="fi"></div>
+    <div class="items-box">
+      <div class="items-hdr">기도 항목</div>
+      <div class="fg"><label class="fl">항목 1</label><input id="f-i1" class="fi" placeholder="첫 번째 기도 내용"></div>
+      <div class="fg"><label class="fl">항목 2</label><input id="f-i2" class="fi" placeholder="두 번째 기도 내용"></div>
+      <div class="fg"><label class="fl">항목 3</label><input id="f-i3" class="fi" placeholder="세 번째 기도 내용"></div>
+      <div class="fg"><label class="fl">항목 4</label><input id="f-i4" class="fi" placeholder="네 번째 기도 내용"></div>
+      <div class="fg"><label class="fl">항목 5</label><input id="f-i5" class="fi" placeholder="다섯 번째 기도 내용"></div>
+    </div>
     <button class="btn btn-p" id="btn-save">🙏 기도제목 추가</button>
   </div>
 </div>
@@ -595,13 +610,14 @@ function setF(f){cf=f;rGroup();}
 /* ── 기도제목 카드 HTML ── */
 function piH(p){
   const st=ST[p.status]||ST['미응답'];
-  const pv=p.content?p.content.replace(/\n/g,' ').slice(0,55)+(p.content.length>55?'…':''):'';
+  const items=(p.items||[]).filter(Boolean);
+  const preview=items.length>0 ? items.slice(0,2).map((s,i)=>'항목'+(i+1)+': '+s).join(' · ') : (p.content?p.content.replace(/\n/g,' ').slice(0,55)+(p.content.length>55?'…':''):'');
   const pd=p.prayDates||[];
   return '<div class="pi" id="pi-'+p.id+'" style="border-left-color:'+gBD(p.group)+'">'
-    +'<div class="pi-top"><div class="pi-nm">'+esc(p.name||'')+'</div>'
+    +'<div class="pi-top"><div class="pi-nm">'+esc(p.name||'')+(p.affiliation?' <span style="font-size:11px;color:var(--g400);font-weight:500">'+esc(p.affiliation)+'</span>':'')+'</div>'
     +'<span class="badge" style="background:'+st.bg+';color:'+st.col+'">'+st.em+' '+p.status+'</span></div>'
     +'<div class="pi-sj">'+esc(p.subject||'')+'</div>'
-    +(pv?'<div class="pi-pv">'+esc(pv)+'</div>':'')
+    +(preview?'<div class="pi-pv">'+esc(preview)+'</div>':'')
     +'<div class="pi-bot"><span class="pi-dt">📅 '+fdt(p.date)+'</span>'
     +'<button class="pd-btn" data-pid="'+p.id+'" onclick="recPD(this.dataset.pid,event)">'+(pd.length>0?'🙏 '+pd.length+'회':'🙏 기도')+'</button>'
     +'</div></div>';
@@ -650,9 +666,18 @@ function rDetail(){
       +'</div>';
   }
   h+='<div class="dc"><div class="dl">그룹</div><div class="dv">'+gEM(p.group)+' '+esc(p.group)+'</div></div>'
+    +(p.affiliation?'<div class="dc"><div class="dl">소속</div><div class="dv">'+esc(p.affiliation)+'</div></div>':'')
     +'<div class="dc"><div class="dl">기도 시작일</div><div class="dv">📅 '+fdt(p.date)+'</div></div>'
     +'<div class="dc"><div class="dl">기도 제목</div><div class="dv" style="font-weight:700">'+esc(p.subject)+'</div></div>';
-  if(p.content)h+='<div class="dc"><div class="dl">상세 내용</div><div class="dv" style="white-space:pre-wrap">'+esc(p.content)+'</div></div>';
+  const items=(p.items||[]);
+  const hasItems=items.some(Boolean);
+  if(hasItems){
+    h+='<div class="dc"><div class="dl">기도 항목</div>'
+      +items.map((it,i)=>it?'<div class="dv-item"><span class="dv-inum">'+(i+1)+'</span><span>'+esc(it)+'</span></div>':'').join('')
+      +'</div>';
+  } else if(p.content){
+    h+='<div class="dc"><div class="dl">상세 내용</div><div class="dv" style="white-space:pre-wrap">'+esc(p.content)+'</div></div>';
+  }
   h+='<div class="hr"></div><button class="btn btn-d" onclick="delP()">🗑️ 이 기도제목 삭제</button>';
   document.getElementById('detail-body').innerHTML=h;
 }
@@ -669,22 +694,44 @@ function chgSt(s){
 function delP(){if(!confirm('이 기도제목을 삭제하시겠습니까?'))return;prayers=prayers.filter(x=>x.id!==cid);sv();toast('🗑️ 삭제');goto('group');}
 
 /* ── 폼 ── */
+function fv(id){ return document.getElementById(id)?.value||''; }
+function fs(id,val){ const el=document.getElementById(id); if(el) el.value=val||''; }
+
 function fillForm(p){
   const sel=document.getElementById('f-group');
   sel.innerHTML=gNms().map(n=>'<option value="'+n+'">'+gEM(n)+' '+n+'</option>').join('');
-  if(p){sel.value=p.group;document.getElementById('f-name').value=p.name||'';document.getElementById('f-subject').value=p.subject||'';document.getElementById('f-content').value=p.content||'';document.getElementById('f-date').value=p.date||tod();}
-  else{if(cg)sel.value=cg;document.getElementById('f-name').value='';document.getElementById('f-subject').value='';document.getElementById('f-content').value='';document.getElementById('f-date').value=tod();}
+  if(p){
+    sel.value=p.group||gNms()[0];
+    fs('f-affil',  p.affiliation||'');
+    fs('f-name',   p.name||'');
+    fs('f-subject',p.subject||'');
+    fs('f-date',   p.date||tod());
+    const items=p.items||['','','','',''];
+    fs('f-i1', items[0]||''); fs('f-i2', items[1]||'');
+    fs('f-i3', items[2]||''); fs('f-i4', items[3]||'');
+    fs('f-i5', items[4]||'');
+  } else {
+    if(cg) sel.value=cg;
+    ['f-affil','f-name','f-subject','f-i1','f-i2','f-i3','f-i4','f-i5'].forEach(id=>fs(id,''));
+    fs('f-date', tod());
+  }
 }
 function openAdd(){cid=null;fromEdit=false;fillForm(null);document.getElementById('form-ttl').textContent='새 기도제목 추가';document.getElementById('btn-save').textContent='🙏 기도제목 추가';goto('form');}
 function openEdit(){const p=prayers.find(x=>x.id===cid);if(!p)return;fromEdit=false;fillForm(p);document.getElementById('form-ttl').textContent='기도제목 수정';document.getElementById('btn-save').textContent='✅ 수정 완료';goto('form');}
 function openEditD(id){cid=id;fromEdit=true;const p=prayers.find(x=>x.id===id);if(!p)return;fillForm(p);document.getElementById('form-ttl').textContent='기도제목 수정';document.getElementById('btn-save').textContent='✅ 수정 완료';goto('form');}
 
 document.getElementById('btn-save').onclick=()=>{
-  const name=document.getElementById('f-name').value.trim();
-  const subj=document.getElementById('f-subject').value.trim();
+  const name=fv('f-name').trim();
+  const subj=fv('f-subject').trim();
   if(!name){alert('이름을 입력해주세요');return;}
   if(!subj){alert('기도제목을 입력해주세요');return;}
-  const d={group:document.getElementById('f-group').value,name,subject:subj,content:document.getElementById('f-content').value.trim(),date:document.getElementById('f-date').value||tod()};
+  const d={
+    group: fv('f-group'),
+    affiliation: fv('f-affil').trim(),
+    name, subject: subj,
+    date: fv('f-date')||tod(),
+    items: [fv('f-i1'),fv('f-i2'),fv('f-i3'),fv('f-i4'),fv('f-i5')].map(s=>s.trim())
+  };
   if(cid){const p=prayers.find(x=>x.id===cid);if(p)Object.assign(p,d);sv();toast('✅ 저장');goto(fromEdit?'groupedit':'detail');}
   else{prayers.unshift({id:uid(),status:'미응답',responseDate:'',responseMemo:'',prayDates:[],...d});sv();toast('✅ 추가');goto('group');}
 };
@@ -966,7 +1013,7 @@ function rSearch(){document.getElementById('sq').value='';document.getElementByI
 document.getElementById('sq').oninput=function(){
   const q=this.value.trim();const el=document.getElementById('s-res');
   if(!q){el.innerHTML='<div class="empty"><div class="ei">🔍</div><div class="et">무엇을 찾으시나요?</div></div>';return;}
-  const res=prayers.filter(p=>[p.name,p.subject,p.content,p.group].some(v=>v&&v.includes(q)));
+  const res=prayers.filter(p=>[p.name,p.subject,p.affiliation,p.group,...(p.items||[])].some(v=>v&&v.includes(q)));
   if(!res.length){el.innerHTML='<div class="empty"><div class="ei">😔</div><div class="et">검색 결과 없음</div></div>';return;}
   el.innerHTML='<div class="rcnt">총 '+res.length+'개</div>'+res.map(p=>piH(p)).join('');
   res.forEach(p=>{const it=document.getElementById('pi-'+p.id);if(it)it.onclick=()=>{cg=p.group;openDet(p.id);};});
@@ -1114,15 +1161,21 @@ function updCard(){
   document.getElementById('p-amen').textContent=pidx<plist.length-1?'아멘 · 다음 →':'🙏 기도 마치기';
   const prev=cnts[p.id]||0,th=prev+1;
   const lbl=['','첫 번째','두 번째','세 번째','네 번째','다섯 번째'][th]||(th+'번째');
+  const items2=(p.items||[]).filter(Boolean);
   const col=p.isCustom?'#c084fc':gCol(p.group);
   const cbg=p.isCustom?'rgba(192,132,252,.15)':gCBG(p.group);
   document.getElementById('pray-body').innerHTML='<div class="pray-card">'
     +'<span class="pc-grp" style="color:'+col+';background:'+cbg+'">'+(p.isCustom?'✏️ 직접입력':gEM(p.group)+' '+p.group)+'</span>'
-    +'<div class="pc-nm">'+esc(p.name||'')+'</div>'
+    +'<div class="pc-nm">'+esc(p.name||'')+(p.affiliation?' <span style="font-size:13px;color:rgba(255,255,255,.45);font-weight:400">'+esc(p.affiliation)+'</span>':'')+'</div>'
     +'<div class="pc-sj">'+esc(p.subject||'')+'</div>'
     +'<div class="pc-cnt">이번이 '+lbl+' 기도입니다</div>'
     +'<div class="pc-div"></div>'
-    +(p.content?'<div class="pc-body">'+esc(p.content)+'</div>':'<div class="pc-empty">상세 내용이 없습니다</div>')
+    +(p.content?'<div class="pc-body">'+esc(p.content)+'</div>'
+      :(items2.length>0
+        ?'<div class="pc-body">'+items2.map((it,i)=>'<div class="pc-item"><span class="pc-inum">'+(i+1)+'</span><span>'+esc(it)+'</span></div>').join('')+'</div>'
+        :'<div class="pc-empty">기도 항목이 없습니다</div>'
+      )
+    )
     +'<div class="pc-date">📅 '+fdt(p.date)+'</div></div>';
 }
 function prayNav(d){const n=pidx+d;if(n<0||n>=plist.length)return;pidx=n;updCard();}
@@ -1134,14 +1187,14 @@ function rPrayDone(){document.getElementById('pd-sub').innerHTML='총 '+plist.le
 function openImp(){document.getElementById('imp-modal').style.display='flex';}
 function closeImp(e){if(!e||e.target===document.getElementById('imp-modal'))document.getElementById('imp-modal').style.display='none';}
 function dlTemplate(){
-  const hdr='그룹,이름,기도제목,내용,날짜,상태,응답날짜,응답내용';
-  const ex=(gNms()[0]||'교직원')+',홍길동,건강 회복,허리 통증 기도합니다.,'+tod()+',미응답,,';
+  const hdr='그룹,소속,이름,기도제목,날짜,상태,항목1,항목2,항목3,항목4,항목5,응답날짜,응답내용';
+  const ex=(gNms()[0]||'교직원')+',1목장,홍길동,건강 회복,'+tod()+',미응답,허리 디스크 완쾌,직장 내 관계 회복,,,,,';
   dlCSV(hdr+'\n'+ex,'기도수첩_입력양식.csv');toast('📋 양식 다운로드');
 }
 function exportAll(){
   if(!prayers.length){toast('내보낼 기도제목이 없습니다');return;}
-  const hdr='그룹,이름,기도제목,내용,날짜,상태,응답날짜,응답내용';
-  const rows=prayers.map(p=>[p.group,p.name,p.subject,p.content,p.date,p.status,p.responseDate,p.responseMemo].map(v=>'"'+(v||'').replace(/"/g,'""')+'"').join(','));
+  const hdr='그룹,소속,이름,기도제목,날짜,상태,항목1,항목2,항목3,항목4,항목5,응답날짜,응답내용';
+  const rows=prayers.map(p=>{const it=p.items||['','','','',''];return[p.group,p.affiliation,p.name,p.subject,p.date,p.status,it[0],it[1],it[2],it[3],it[4],p.responseDate,p.responseMemo].map(v=>'"'+(v||'').replace(/"/g,'""')+'"').join(',');});
   dlCSV(hdr+'\n'+rows.join('\n'),'기도수첩_백업_'+tod()+'.csv');toast('📤 내보내기 완료');
 }
 function dlCSV(c,fn){const b=new Blob(['\ufeff'+c],{type:'text/csv;charset=utf-8;'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=fn;a.click();setTimeout(()=>URL.revokeObjectURL(u),100);}
@@ -1158,13 +1211,13 @@ document.getElementById('file-in').onchange=function(){
       const cols=parseCSV(lines[i]).map(c=>c.replace(/"/g,'').trim());
       const obj={};hdrs.forEach((h,idx)=>{obj[h]=cols[idx]||'';});
       const grp=gNms().find(g=>g===obj['그룹'])||gNms().find(g=>obj['그룹']&&obj['그룹'].includes(g))||'기타';
-      imp.push({id:uid(),group:grp,name:obj['이름']||'이름없음',subject:obj['기도제목']||'',content:obj['내용']||'',date:obj['날짜']||tod(),prayDates:[],status:['미응답','진행중','응답됨'].includes(obj['상태'])?obj['상태']:'미응답',responseDate:obj['응답날짜']||'',responseMemo:obj['응답내용']||''});
+      imp.push({id:uid(),group:grp,affiliation:obj['소속']||'',name:obj['이름']||'이름없음',subject:obj['기도제목']||'',date:obj['날짜']||tod(),prayDates:[],items:[obj['항목1']||'',obj['항목2']||'',obj['항목3']||'',obj['항목4']||'',obj['항목5']||''],status:['미응답','진행중','응답됨'].includes(obj['상태'])?obj['상태']:'미응답',responseDate:obj['응답날짜']||'',responseMemo:obj['응답내용']||''});
     }
     return imp;
   }
   function doImp(text){
     const imp=tryP(text);
-    if(!imp){alert('헤더 인식 실패. 첫 줄: 그룹,이름,기도제목,내용,날짜,상태,응답날짜,응답내용');return;}
+    if(!imp){alert('헤더 인식 실패. 첫 줄: 그룹,소속,이름,기도제목,날짜,상태,항목1,항목2,항목3,항목4,항목5,응답날짜,응답내용');return;}
     if(!imp.length){alert('불러온 데이터가 없습니다');return;}
     prayers=[...imp,...prayers];sv();closeImp();goto('home');
     setTimeout(()=>toast('✅ '+imp.length+'개 기도제목을 불러왔습니다'),150);
