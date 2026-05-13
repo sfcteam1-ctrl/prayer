@@ -737,7 +737,8 @@ document.getElementById('btn-save').onclick=()=>{
 };
 
 /* ── 그룹 편집 ── */
-let geSelected = new Set(); // 선택된 기도제목 ID
+let geSelected = new Set();
+let _geTmMv = null; // touchmove 핸들러 참조 (그룹편집용)
 
 function rGEdit(){
   document.getElementById('gedr-hdr').style.background=gBG(cg);
@@ -801,12 +802,46 @@ function rGEdit(){
   if(btnAll) btnAll.onclick = e=>{ e.stopPropagation(); toggleSelAll(gp); };
   if(btnDel) btnDel.onclick = e=>{ e.stopPropagation(); delSelected(gp); };
 
-  // 터치 드래그 설정
-  gp.forEach(p=>setupDrag(p.id));
+  // 터치 드래그: 컨테이너 레벨 위임 (누적 없음)
+  let _lt=null, _lid=null, _ly=0, _ld=false;
+
+  el.ontouchstart = e => {
+    const h = e.target.closest('.ge-handle');
+    if(!h) return;
+    _lid = h.closest('.ge-item')?.dataset.id; if(!_lid) return;
+    _ly = e.touches[0].clientY; _ld = false;
+    _lt = setTimeout(()=>{
+      _ld = true;
+      if(navigator.vibrate) navigator.vibrate(60);
+      const item = document.getElementById('gei-'+_lid);
+      if(item) item.classList.add('ge-dragging');
+    }, 800);
+  };
+
+  el.ontouchend = e => {
+    clearTimeout(_lt); _lt=null;
+    if(!_ld || !_lid){ _ld=false; _lid=null; return; }
+    const item = document.getElementById('gei-'+_lid);
+    if(item) item.classList.remove('ge-dragging');
+    const dy = e.changedTouches[0].clientY - _ly;
+    const id = _lid;
+    _ld=false; _lid=null;
+    if(dy < -40)     moveP(id, -1);
+    else if(dy > 40) moveP(id,  1);
+  };
+
+  el.ontouchcancel = () => { clearTimeout(_lt); _lt=null; _ld=false; _lid=null; };
+
+  if(_geTmMv) el.removeEventListener('touchmove', _geTmMv);
+  _geTmMv = e => {
+    if(!_lt && !_ld) return;
+    if(!_ld && Math.abs(e.touches[0].clientY-_ly) > 14){ clearTimeout(_lt); _lt=null; return; }
+    if(_ld) e.preventDefault();
+  };
+  el.addEventListener('touchmove', _geTmMv, {passive:false});
 }
 
 function toggleSelAll(gp){
-  const allSel = gp.every(p=>geSelected.has(p.id));
   if(allSel) gp.forEach(p=>geSelected.delete(p.id));
   else       gp.forEach(p=>geSelected.add(p.id));
   rGEdit();
@@ -850,44 +885,6 @@ function geEditClick(e){
   if(mid){ openDet(mid.closest('.ge-item').dataset.id); }
 }
 
-let _lpTimer=null, _lpId=null, _lpY0=0, _lpDragging=false;
-
-function setupDrag(id){
-  const el=document.getElementById('gei-'+id);
-  if(!el) return;
-
-  const onStart=e=>{
-    const touch=e.touches?e.touches[0]:e;
-    _lpY0=touch.clientY; _lpId=id; _lpDragging=false;
-    _lpTimer=setTimeout(()=>{
-      _lpDragging=true;
-      if(navigator.vibrate) navigator.vibrate(60);
-      el.classList.add('ge-dragging');
-    },800);
-  };
-  const onMove=e=>{
-    if(!_lpDragging||_lpId!==id){ if(Math.abs((e.touches?e.touches[0]:e).clientY-_lpY0)>12) clearTimeout(_lpTimer); return; }
-    e.preventDefault();
-  };
-  const onEnd=e=>{
-    clearTimeout(_lpTimer);
-    if(!_lpDragging||_lpId!==id){ el.classList.remove('ge-dragging'); return; }
-    el.classList.remove('ge-dragging');
-    const endY=(e.changedTouches?e.changedTouches[0]:e).clientY;
-    const dy=endY-_lpY0;
-    if(dy<-40)      moveP(id,-1);
-    else if(dy>40)  moveP(id,1);
-    _lpDragging=false; _lpId=null;
-  };
-
-  el.addEventListener('touchstart',onStart,{passive:true});
-  el.addEventListener('touchmove', onMove,{passive:false});
-  el.addEventListener('touchend',  onEnd, {passive:true});
-  el.addEventListener('mousedown',onStart);
-  el.addEventListener('mousemove',onMove);
-  el.addEventListener('mouseup',  onEnd);
-}
-
 function moveP(id,dir){
   const gIdxs=[];
   prayers.forEach((p,i)=>{ if(p.group===cg) gIdxs.push(i); });
@@ -901,18 +898,20 @@ function moveP(id,dir){
 
 /* ── 그룹 관리 ── */
 let gmE=null,gmEm=GM_EMS[0],gmPi=0;
+let _gmTmMv = null; // touchmove 핸들러 참조 (제거용)
+
 function rGMgr(){
   const el=document.getElementById('gmgr-body');
   if(!groups.length){el.innerHTML='<div class="empty"><div class="ei">📂</div><div class="et">그룹이 없습니다</div></div>';return;}
-  el.innerHTML='<div class="ge-tip">▲▼ 버튼 또는 카드를 1초 누른 채 드래그해서 순서 변경</div>'
+  el.innerHTML='<div class="ge-tip">▲▼ 버튼으로 이동 · ≡ 핸들을 1초 누른 채 위아래로 드래그</div>'
     +groups.map((g,i)=>{
       const pal=PAL[g.pi%PAL.length];
       const cnt=prayers.filter(p=>p.group===g.name).length;
       const first=(i===0), last=(i===groups.length-1);
-      return '<div class="gm-item" id="gmi-'+g.id+'" data-gid="'+g.id+'" style="border-left:4px solid '+pal.bd+';position:relative">'
+      return '<div class="gm-item" id="gmi-'+g.id+'" data-gid="'+g.id+'" style="border-left:4px solid '+pal.bd+'">'
         +'<div class="ge-left">'
         +'<button class="ge-ab ge-up" data-gid="'+g.id+'" '+(first?'disabled':'')+'>▲</button>'
-        +'<div class="ge-handle">≡</div>'
+        +'<div class="ge-handle" data-gid="'+g.id+'">≡</div>'
         +'<button class="ge-ab ge-dn" data-gid="'+g.id+'" '+(last?'disabled':'')+'>▼</button>'
         +'</div>'
         +'<div class="gm-sw" style="background:'+pal.bg+'">'+g.em+'</div>'
@@ -923,12 +922,50 @@ function rGMgr(){
         +'</div></div>';
     }).join('');
 
-  // 이벤트 위임
-  el.onclick=null;
-  el.addEventListener('click', gmgrClick);
+  // ── 클릭: onclick 직접 할당 (addEventListener 누적 방지) ──
+  el.onclick = gmgrClick;
 
-  // 드래그 설정
-  groups.forEach(g=>setupGDrag(g.id));
+  // ── 터치 드래그: 컨테이너 레벨 위임 ──
+  let _gt=null, _gid=null, _gy=0, _gd=false;
+
+  el.ontouchstart = e => {
+    const h = e.target.closest('.ge-handle');
+    if(!h) return;
+    _gid = h.dataset.gid; _gy = e.touches[0].clientY; _gd = false;
+    _gt = setTimeout(()=>{
+      _gd = true;
+      if(navigator.vibrate) navigator.vibrate(60);
+      const item = document.getElementById('gmi-'+_gid);
+      if(item) item.classList.add('ge-dragging');
+    }, 800);
+  };
+
+  el.ontouchend = e => {
+    clearTimeout(_gt); _gt = null;
+    if(!_gd || !_gid){ _gd=false; _gid=null; return; }
+    const item = document.getElementById('gmi-'+_gid);
+    if(item) item.classList.remove('ge-dragging');
+    const dy = e.changedTouches[0].clientY - _gy;
+    const id = _gid;
+    _gd=false; _gid=null;
+    if(dy < -40)     moveG(id, -1);
+    else if(dy > 40) moveG(id,  1);
+    else toast('위아래로 40px 이상 드래그하세요');
+  };
+
+  el.ontouchcancel = () => {
+    clearTimeout(_gt); _gt=null; _gd=false; _gid=null;
+  };
+
+  // touchmove: passive:false 필요 → 이전 것 제거 후 재등록
+  if(_gmTmMv) el.removeEventListener('touchmove', _gmTmMv);
+  _gmTmMv = e => {
+    if(!_gt && !_gd) return;
+    const dy = Math.abs(e.touches[0].clientY - _gy);
+    if(!_gd && dy > 14){ clearTimeout(_gt); _gt=null; return; } // 드래그 임계 초과 → 취소
+    if(_gd) e.preventDefault(); // 드래그 중 스크롤 방지
+  };
+  el.addEventListener('touchmove', _gmTmMv, {passive:false});
 }
 
 function gmgrClick(e){
@@ -949,42 +986,6 @@ function moveG(gid,dir){
   [groups[idx],groups[tIdx]]=[groups[tIdx],groups[idx]];
   svG(); rGMgr();
   setTimeout(()=>{ const el=document.getElementById('gmi-'+gid); if(el) el.scrollIntoView({behavior:'smooth',block:'nearest'}); },60);
-}
-
-let _glpTimer=null, _glpId=null, _glpY0=0, _glpDragging=false;
-
-function setupGDrag(gid){
-  const el=document.getElementById('gmi-'+gid);
-  if(!el) return;
-  const onStart=e=>{
-    const touch=e.touches?e.touches[0]:e;
-    _glpY0=touch.clientY; _glpId=gid; _glpDragging=false;
-    _glpTimer=setTimeout(()=>{
-      _glpDragging=true;
-      if(navigator.vibrate) navigator.vibrate(60);
-      el.classList.add('ge-dragging');
-    },800);
-  };
-  const onMove=e=>{
-    if(!_glpDragging||_glpId!==gid){ if(Math.abs((e.touches?e.touches[0]:e).clientY-_glpY0)>12) clearTimeout(_glpTimer); return; }
-    e.preventDefault();
-  };
-  const onEnd=e=>{
-    clearTimeout(_glpTimer);
-    if(!_glpDragging||_glpId!==gid){ el.classList.remove('ge-dragging'); return; }
-    el.classList.remove('ge-dragging');
-    const endY=(e.changedTouches?e.changedTouches[0]:e).clientY;
-    const dy=endY-_glpY0;
-    if(dy<-40) moveG(gid,-1);
-    else if(dy>40) moveG(gid,1);
-    _glpDragging=false; _glpId=null;
-  };
-  el.addEventListener('touchstart',onStart,{passive:true});
-  el.addEventListener('touchmove', onMove,{passive:false});
-  el.addEventListener('touchend',  onEnd, {passive:true});
-  el.addEventListener('mousedown',onStart);
-  el.addEventListener('mousemove',onMove);
-  el.addEventListener('mouseup',  onEnd);
 }
 function openAddGroup(){gmE=null;gmEm=GM_EMS[0];gmPi=0;document.getElementById('gm-ttl').textContent='새 그룹 추가';document.getElementById('gm-name').value='';rGModal();document.getElementById('gm-modal').style.display='flex';document.getElementById('gm-save').onclick=svG2;}
 function openEG(gid){const g=groups.find(x=>x.id===gid);if(!g)return;gmE=g;gmEm=g.em;gmPi=g.pi;document.getElementById('gm-ttl').textContent='그룹 수정';document.getElementById('gm-name').value=g.name;rGModal();document.getElementById('gm-modal').style.display='flex';document.getElementById('gm-save').onclick=svG2;}
