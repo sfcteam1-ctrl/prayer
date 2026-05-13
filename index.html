@@ -485,6 +485,8 @@ function goto(sc){
   const el=document.getElementById('s-'+sc);if(el)el.classList.add('active');
   const nb=document.getElementById('nav-'+sc);if(nb)nb.classList.add('on');
   cs=sc;
+  // 히스토리에 상태 추가 (뒤로가기 인터셉트용)
+  try{ history.pushState({sc}, '', location.pathname+location.search); }catch{}
   ({home:rHome,group:rGroup,groupedit:rGEdit,groupmgr:rGMgr,detail:rDetail,
     search:rSearch,archive:rArchive,praysel:rPraySel,pray:rPray,praydone:rPrayDone,
     day:rDay,dayedit:rDayEdit})[sc]?.();
@@ -785,18 +787,87 @@ let gmE=null,gmEm=GM_EMS[0],gmPi=0;
 function rGMgr(){
   const el=document.getElementById('gmgr-body');
   if(!groups.length){el.innerHTML='<div class="empty"><div class="ei">📂</div><div class="et">그룹이 없습니다</div></div>';return;}
-  el.innerHTML='<div style="font-size:13px;color:var(--g400);margin-bottom:14px">그룹 이름·아이콘·색상을 자유롭게 수정할 수 있습니다</div>'
-    +groups.map(g=>{
+  el.innerHTML='<div class="ge-tip">▲▼ 버튼 또는 카드를 1초 누른 채 드래그해서 순서 변경</div>'
+    +groups.map((g,i)=>{
       const pal=PAL[g.pi%PAL.length];
       const cnt=prayers.filter(p=>p.group===g.name).length;
-      return '<div class="gm-item" style="border-left:4px solid '+pal.bd+'">'
+      const first=(i===0), last=(i===groups.length-1);
+      return '<div class="gm-item" id="gmi-'+g.id+'" data-gid="'+g.id+'" style="border-left:4px solid '+pal.bd+';position:relative">'
+        +'<div class="ge-left">'
+        +'<button class="ge-ab ge-up" data-gid="'+g.id+'" '+(first?'disabled':'')+'>▲</button>'
+        +'<div class="ge-handle">≡</div>'
+        +'<button class="ge-ab ge-dn" data-gid="'+g.id+'" '+(last?'disabled':'')+'>▼</button>'
+        +'</div>'
         +'<div class="gm-sw" style="background:'+pal.bg+'">'+g.em+'</div>'
         +'<div class="gm-info"><div class="gm-nm">'+esc(g.name)+'</div><div class="gm-cnt">기도제목 '+cnt+'개</div></div>'
         +'<div class="gm-btns">'
-        +'<button class="ge-edit" data-gid="'+g.id+'" onclick="openEG(this.dataset.gid)">✏️ 수정</button>'
-        +(cnt===0?'<button class="ge-del" data-gid="'+g.id+'" data-nm="'+esc(g.name)+'" onclick="delG(this.dataset.gid,this.dataset.nm)">🗑️ 삭제</button>':'<button class="ge-del" style="opacity:.3;cursor:default">🗑️</button>')
+        +'<button class="ge-edit" data-gid="'+g.id+'">✏️</button>'
+        +(cnt===0?'<button class="ge-del" data-gid="'+g.id+'" data-nm="'+esc(g.name)+'">🗑️</button>':'<button class="ge-del" style="opacity:.3;cursor:default" disabled>🗑️</button>')
         +'</div></div>';
     }).join('');
+
+  // 이벤트 위임
+  el.onclick=null;
+  el.addEventListener('click', gmgrClick);
+
+  // 드래그 설정
+  groups.forEach(g=>setupGDrag(g.id));
+}
+
+function gmgrClick(e){
+  const upBtn=e.target.closest('.ge-up');
+  const dnBtn=e.target.closest('.ge-dn');
+  const editBtn=e.target.closest('.ge-edit');
+  const delBtn=e.target.closest('.ge-del');
+  if(upBtn) { e.stopPropagation(); moveG(upBtn.dataset.gid,-1); return; }
+  if(dnBtn) { e.stopPropagation(); moveG(dnBtn.dataset.gid,1);  return; }
+  if(editBtn){ e.stopPropagation(); openEG(editBtn.dataset.gid); return; }
+  if(delBtn && !delBtn.disabled){ e.stopPropagation(); delG(delBtn.dataset.gid,delBtn.dataset.nm); }
+}
+
+function moveG(gid,dir){
+  const idx=groups.findIndex(g=>g.id===gid);
+  const tIdx=idx+dir;
+  if(tIdx<0||tIdx>=groups.length){ toast(dir<0?'이미 맨 위입니다':'이미 맨 아래입니다'); return; }
+  [groups[idx],groups[tIdx]]=[groups[tIdx],groups[idx]];
+  svG(); rGMgr();
+  setTimeout(()=>{ const el=document.getElementById('gmi-'+gid); if(el) el.scrollIntoView({behavior:'smooth',block:'nearest'}); },60);
+}
+
+let _glpTimer=null, _glpId=null, _glpY0=0, _glpDragging=false;
+
+function setupGDrag(gid){
+  const el=document.getElementById('gmi-'+gid);
+  if(!el) return;
+  const onStart=e=>{
+    const touch=e.touches?e.touches[0]:e;
+    _glpY0=touch.clientY; _glpId=gid; _glpDragging=false;
+    _glpTimer=setTimeout(()=>{
+      _glpDragging=true;
+      if(navigator.vibrate) navigator.vibrate(60);
+      el.classList.add('ge-dragging');
+    },800);
+  };
+  const onMove=e=>{
+    if(!_glpDragging||_glpId!==gid){ if(Math.abs((e.touches?e.touches[0]:e).clientY-_glpY0)>12) clearTimeout(_glpTimer); return; }
+    e.preventDefault();
+  };
+  const onEnd=e=>{
+    clearTimeout(_glpTimer);
+    if(!_glpDragging||_glpId!==gid){ el.classList.remove('ge-dragging'); return; }
+    el.classList.remove('ge-dragging');
+    const endY=(e.changedTouches?e.changedTouches[0]:e).clientY;
+    const dy=endY-_glpY0;
+    if(dy<-40) moveG(gid,-1);
+    else if(dy>40) moveG(gid,1);
+    _glpDragging=false; _glpId=null;
+  };
+  el.addEventListener('touchstart',onStart,{passive:true});
+  el.addEventListener('touchmove', onMove,{passive:false});
+  el.addEventListener('touchend',  onEnd, {passive:true});
+  el.addEventListener('mousedown',onStart);
+  el.addEventListener('mousemove',onMove);
+  el.addEventListener('mouseup',  onEnd);
 }
 function openAddGroup(){gmE=null;gmEm=GM_EMS[0];gmPi=0;document.getElementById('gm-ttl').textContent='새 그룹 추가';document.getElementById('gm-name').value='';rGModal();document.getElementById('gm-modal').style.display='flex';document.getElementById('gm-save').onclick=svG2;}
 function openEG(gid){const g=groups.find(x=>x.id===gid);if(!g)return;gmE=g;gmEm=g.em;gmPi=g.pi;document.getElementById('gm-ttl').textContent='그룹 수정';document.getElementById('gm-name').value=g.name;rGModal();document.getElementById('gm-modal').style.display='flex';document.getElementById('gm-save').onclick=svG2;}
@@ -1038,7 +1109,37 @@ document.getElementById('file-in').onchange=function(){
 };
 
 /* ── 초기화 ── */
+// 초기 히스토리 상태 (뒤로가기 인터셉트용 베이스)
+try{ history.replaceState({sc:'home'}, '', location.pathname+location.search); }catch{}
 goto('home');
+
+/* ── 안드로이드 뒤로가기 버튼 처리 ── */
+let _lastBackTime = 0;
+
+window.addEventListener('popstate', e => {
+  // 브라우저 뒤로가기 → 앱 내 뒤로가기로 전환
+  if(cs !== 'home'){
+    back();
+    // 항상 히스토리 엔트리 유지 (앱이 닫히지 않도록)
+    try{ history.pushState({sc:cs}, '', location.pathname+location.search); }catch{}
+  } else {
+    // 홈에서 뒤로가기 → 종료 확인
+    try{ history.pushState({sc:'home'}, '', location.pathname+location.search); }catch{}
+    const now = Date.now();
+    if(now - _lastBackTime < 2000){
+      // 2초 안에 두 번 → 종료 확인 다이얼로그
+      if(confirm('기도수첩을 종료하시겠습니까?')){
+        // PWA 종료 시도 (Android Chrome)
+        try { window.close(); } catch{}
+        // window.close()가 안 되면 빈 페이지로 (앱 종료 효과)
+        setTimeout(()=>{ try{ history.go(-(history.length)); }catch{} }, 100);
+      }
+    } else {
+      toast('한 번 더 누르면 종료됩니다');
+      _lastBackTime = now;
+    }
+  }
+});
 </script>
 
 <script>
