@@ -312,7 +312,6 @@ body{font-family:var(--sans);background:#e5e7eb;color:var(--g900);min-height:100
     <div class="fg"><label class="fl">그룹 *</label><select id="f-group" class="fi fi-sel"></select></div>
     <div class="fg"><label class="fl">소속</label><input id="f-affil" class="fi" placeholder="예: 1목장, 청년부, 3학년 2반"></div>
     <div class="fg"><label class="fl">이름 *</label><input id="f-name" class="fi" placeholder="예: 홍길동 집사님"></div>
-    <div class="fg"><label class="fl">기도 제목 *</label><input id="f-subject" class="fi" placeholder="예: 건강 회복, 취업"></div>
     <div class="fg"><label class="fl">날짜</label><input type="date" id="f-date" class="fi"></div>
     <div class="items-box">
       <div class="items-hdr">기도 항목</div>
@@ -611,14 +610,20 @@ function setF(f){cf=f;rGroup();}
 function piH(p){
   const st=ST[p.status]||ST['미응답'];
   const items=(p.items||[]).filter(Boolean);
-  const preview=items.length>0 ? items.slice(0,2).map((s,i)=>'항목'+(i+1)+': '+s).join(' · ') : (p.content?p.content.replace(/\n/g,' ').slice(0,55)+(p.content.length>55?'…':''):'');
+  // 구 데이터 호환: items 없으면 subject 표시
+  const preview = items.length>0
+    ? items.slice(0,2).map((s,i)=>'항목'+(i+1)+': '+s).join(' · ')
+    : (p.subject||'');
   const pd=p.prayDates||[];
   return '<div class="pi" id="pi-'+p.id+'" style="border-left-color:'+gBD(p.group)+'">'
-    +'<div class="pi-top"><div class="pi-nm">'+esc(p.name||'')+(p.affiliation?' <span style="font-size:11px;color:var(--g400);font-weight:500">'+esc(p.affiliation)+'</span>':'')+'</div>'
-    +'<span class="badge" style="background:'+st.bg+';color:'+st.col+'">'+st.em+' '+p.status+'</span></div>'
-    +'<div class="pi-sj">'+esc(p.subject||'')+'</div>'
-    +(preview?'<div class="pi-pv">'+esc(preview)+'</div>':'')
-    +'<div class="pi-bot"><span class="pi-dt">📅 '+fdt(p.date)+'</span>'
+    +'<div class="pi-top">'
+    +'<div class="pi-nm">'+esc(p.name||'')
+    +(p.affiliation?' <span style="font-size:11px;color:var(--g400);font-weight:500">'+esc(p.affiliation)+'</span>':'')
+    +'</div>'
+    +'<span class="badge" style="background:'+st.bg+';color:'+st.col+'">'+st.em+' '+p.status+'</span>'
+    +'</div>'
+    +(preview?'<div class="pi-pv" style="margin-top:4px">'+esc(preview)+'</div>':'')
+    +'<div class="pi-bot" style="margin-top:6px"><span class="pi-dt">📅 '+fdt(p.date)+'</span>'
     +'<button class="pd-btn" data-pid="'+p.id+'" onclick="recPD(this.dataset.pid,event)">'+(pd.length>0?'🙏 '+pd.length+'회':'🙏 기도')+'</button>'
     +'</div></div>';
 }
@@ -667,16 +672,17 @@ function rDetail(){
   }
   h+='<div class="dc"><div class="dl">그룹</div><div class="dv">'+gEM(p.group)+' '+esc(p.group)+'</div></div>'
     +(p.affiliation?'<div class="dc"><div class="dl">소속</div><div class="dv">'+esc(p.affiliation)+'</div></div>':'')
-    +'<div class="dc"><div class="dl">기도 시작일</div><div class="dv">📅 '+fdt(p.date)+'</div></div>'
-    +'<div class="dc"><div class="dl">기도 제목</div><div class="dv" style="font-weight:700">'+esc(p.subject)+'</div></div>';
+    +'<div class="dc"><div class="dl">이름</div><div class="dv" style="font-weight:700">'+esc(p.name)+'</div></div>'
+    +'<div class="dc"><div class="dl">기도 시작일</div><div class="dv">📅 '+fdt(p.date)+'</div></div>';
   const items=(p.items||[]);
   const hasItems=items.some(Boolean);
   if(hasItems){
     h+='<div class="dc"><div class="dl">기도 항목</div>'
       +items.map((it,i)=>it?'<div class="dv-item"><span class="dv-inum">'+(i+1)+'</span><span>'+esc(it)+'</span></div>':'').join('')
       +'</div>';
-  } else if(p.content){
-    h+='<div class="dc"><div class="dl">상세 내용</div><div class="dv" style="white-space:pre-wrap">'+esc(p.content)+'</div></div>';
+  } else if(p.subject||p.content){
+    // 구 데이터 호환
+    h+='<div class="dc"><div class="dl">기도 내용</div><div class="dv" style="white-space:pre-wrap">'+esc(p.subject||(p.content||''))+'</div></div>';
   }
   h+='<div class="hr"></div><button class="btn btn-d" onclick="delP()">🗑️ 이 기도제목 삭제</button>';
   document.getElementById('detail-body').innerHTML=h;
@@ -702,17 +708,16 @@ function fillForm(p){
   sel.innerHTML=gNms().map(n=>'<option value="'+n+'">'+gEM(n)+' '+n+'</option>').join('');
   if(p){
     sel.value=p.group||gNms()[0];
-    fs('f-affil',  p.affiliation||'');
-    fs('f-name',   p.name||'');
-    fs('f-subject',p.subject||'');
-    fs('f-date',   p.date||tod());
+    fs('f-affil', p.affiliation||'');
+    fs('f-name',  p.name||'');
+    fs('f-date',  p.date||tod());
     const items=p.items||['','','','',''];
-    fs('f-i1', items[0]||''); fs('f-i2', items[1]||'');
-    fs('f-i3', items[2]||''); fs('f-i4', items[3]||'');
-    fs('f-i5', items[4]||'');
+    fs('f-i1',items[0]||''); fs('f-i2',items[1]||'');
+    fs('f-i3',items[2]||''); fs('f-i4',items[3]||'');
+    fs('f-i5',items[4]||'');
   } else {
     if(cg) sel.value=cg;
-    ['f-affil','f-name','f-subject','f-i1','f-i2','f-i3','f-i4','f-i5'].forEach(id=>fs(id,''));
+    ['f-affil','f-name','f-i1','f-i2','f-i3','f-i4','f-i5'].forEach(id=>fs(id,''));
     fs('f-date', tod());
   }
 }
@@ -722,15 +727,16 @@ function openEditD(id){cid=id;fromEdit=true;const p=prayers.find(x=>x.id===id);i
 
 document.getElementById('btn-save').onclick=()=>{
   const name=fv('f-name').trim();
-  const subj=fv('f-subject').trim();
   if(!name){alert('이름을 입력해주세요');return;}
-  if(!subj){alert('기도제목을 입력해주세요');return;}
+  const items=[fv('f-i1'),fv('f-i2'),fv('f-i3'),fv('f-i4'),fv('f-i5')].map(s=>s.trim());
+  // subject = 첫 번째 항목 (검색·표시 호환)
+  const subject = items.find(Boolean)||name;
   const d={
     group: fv('f-group'),
     affiliation: fv('f-affil').trim(),
-    name, subject: subj,
+    name, subject,
     date: fv('f-date')||tod(),
-    items: [fv('f-i1'),fv('f-i2'),fv('f-i3'),fv('f-i4'),fv('f-i5')].map(s=>s.trim())
+    items
   };
   if(cid){const p=prayers.find(x=>x.id===cid);if(p)Object.assign(p,d);sv();toast('✅ 저장');goto(fromEdit?'groupedit':'detail');}
   else{prayers.unshift({id:uid(),status:'미응답',responseDate:'',responseMemo:'',prayDates:[],...d});sv();toast('✅ 추가');goto('group');}
@@ -793,14 +799,8 @@ function rGEdit(){
       +'</div>';
   }).join('');
 
-  // 이벤트 위임 — onclick으로 단일 등록
+  // 이벤트 위임 — onclick 단일 핸들러 (툴바 포함 모든 클릭 처리)
   el.onclick = geEditClick;
-
-  // 툴바 버튼
-  const btnAll = document.getElementById('btn-selall');
-  const btnDel = document.getElementById('btn-delsel');
-  if(btnAll) btnAll.onclick = e=>{ e.stopPropagation(); toggleSelAll(gp); };
-  if(btnDel) btnDel.onclick = e=>{ e.stopPropagation(); delSelected(gp); };
 
   // 터치 드래그: 컨테이너 레벨 위임 (누적 없음)
   let _lt=null, _lid=null, _ly=0, _ld=false;
@@ -842,6 +842,7 @@ function rGEdit(){
 }
 
 function toggleSelAll(gp){
+  const allSel = gp.every(p=>geSelected.has(p.id));
   if(allSel) gp.forEach(p=>geSelected.delete(p.id));
   else       gp.forEach(p=>geSelected.add(p.id));
   rGEdit();
@@ -858,24 +859,34 @@ function delSelected(gp){
 }
 
 function geEditClick(e){
-  const chk   = e.target.closest('.ge-chk');
-  const upBtn = e.target.closest('.ge-up');
-  const dnBtn = e.target.closest('.ge-dn');
-  const editBtn=e.target.closest('.ge-edit');
+  // 툴바 버튼
+  const selAll = e.target.closest('.ge-sel-all');
+  const delSel = e.target.closest('.ge-del-sel');
+  // 개별 항목 버튼
+  const chk    = e.target.closest('.ge-chk');
+  const upBtn  = e.target.closest('.ge-up');
+  const dnBtn  = e.target.closest('.ge-dn');
+  const editBtn= e.target.closest('.ge-edit');
   const delBtn = e.target.closest('.ge-del');
-  const mid   = e.target.closest('.ge-mid');
+  const mid    = e.target.closest('.ge-mid');
 
+  if(selAll){
+    const gp=prayers.filter(p=>p.group===cg);
+    toggleSelAll(gp); return;
+  }
+  if(delSel){
+    const gp=prayers.filter(p=>p.group===cg);
+    delSelected(gp); return;
+  }
   if(chk){
-    e.stopPropagation();
     const id=chk.dataset.id;
     if(geSelected.has(id)) geSelected.delete(id); else geSelected.add(id);
     rGEdit(); return;
   }
-  if(upBtn)  { e.stopPropagation(); moveP(upBtn.dataset.id,-1); return; }
-  if(dnBtn)  { e.stopPropagation(); moveP(dnBtn.dataset.id,1);  return; }
-  if(editBtn){ e.stopPropagation(); openEditD(editBtn.dataset.id); return; }
+  if(upBtn)  { moveP(upBtn.dataset.id,-1); return; }
+  if(dnBtn)  { moveP(dnBtn.dataset.id,1);  return; }
+  if(editBtn){ openEditD(editBtn.dataset.id); return; }
   if(delBtn){
-    e.stopPropagation();
     const nm=delBtn.dataset.nm, id=delBtn.dataset.id;
     if(!confirm(nm+'의 기도제목을 삭제하시겠습니까?')) return;
     prayers=prayers.filter(x=>x.id!==id);
@@ -1168,7 +1179,6 @@ function updCard(){
   document.getElementById('pray-body').innerHTML='<div class="pray-card">'
     +'<span class="pc-grp" style="color:'+col+';background:'+cbg+'">'+(p.isCustom?'✏️ 직접입력':gEM(p.group)+' '+p.group)+'</span>'
     +'<div class="pc-nm">'+esc(p.name||'')+(p.affiliation?' <span style="font-size:13px;color:rgba(255,255,255,.45);font-weight:400">'+esc(p.affiliation)+'</span>':'')+'</div>'
-    +'<div class="pc-sj">'+esc(p.subject||'')+'</div>'
     +'<div class="pc-cnt">이번이 '+lbl+' 기도입니다</div>'
     +'<div class="pc-div"></div>'
     +(p.content?'<div class="pc-body">'+esc(p.content)+'</div>'
@@ -1188,14 +1198,14 @@ function rPrayDone(){document.getElementById('pd-sub').innerHTML='총 '+plist.le
 function openImp(){document.getElementById('imp-modal').style.display='flex';}
 function closeImp(e){if(!e||e.target===document.getElementById('imp-modal'))document.getElementById('imp-modal').style.display='none';}
 function dlTemplate(){
-  const hdr='그룹,소속,이름,기도제목,날짜,상태,항목1,항목2,항목3,항목4,항목5,응답날짜,응답내용';
-  const ex=(gNms()[0]||'교직원')+',1목장,홍길동,건강 회복,'+tod()+',미응답,허리 디스크 완쾌,직장 내 관계 회복,,,,,';
+  const hdr='그룹,소속,이름,날짜,상태,항목1,항목2,항목3,항목4,항목5,응답날짜,응답내용';
+  const ex=(gNms()[0]||'교직원')+',1목장,홍길동,'+tod()+',미응답,허리 디스크 완쾌,직장 내 관계 회복,,,,,';
   dlCSV(hdr+'\n'+ex,'기도수첩_입력양식.csv');toast('📋 양식 다운로드');
 }
 function exportAll(){
   if(!prayers.length){toast('내보낼 기도제목이 없습니다');return;}
-  const hdr='그룹,소속,이름,기도제목,날짜,상태,항목1,항목2,항목3,항목4,항목5,응답날짜,응답내용';
-  const rows=prayers.map(p=>{const it=p.items||['','','','',''];return[p.group,p.affiliation,p.name,p.subject,p.date,p.status,it[0],it[1],it[2],it[3],it[4],p.responseDate,p.responseMemo].map(v=>'"'+(v||'').replace(/"/g,'""')+'"').join(',');});
+  const hdr='그룹,소속,이름,날짜,상태,항목1,항목2,항목3,항목4,항목5,응답날짜,응답내용';
+  const rows=prayers.map(p=>{const it=p.items||['','','','',''];return[p.group,p.affiliation,p.name,p.date,p.status,it[0],it[1],it[2],it[3],it[4],p.responseDate,p.responseMemo].map(v=>'"'+(v||'').replace(/"/g,'""')+'"').join(',');});
   dlCSV(hdr+'\n'+rows.join('\n'),'기도수첩_백업_'+tod()+'.csv');toast('📤 내보내기 완료');
 }
 function dlCSV(c,fn){const b=new Blob(['\ufeff'+c],{type:'text/csv;charset=utf-8;'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=fn;a.click();setTimeout(()=>URL.revokeObjectURL(u),100);}
@@ -1205,20 +1215,20 @@ document.getElementById('file-in').onchange=function(){
   function tryP(text){
     const clean=text.replace(/^\uFEFF/,'');const lines=clean.trim().split(/\r?\n/);
     const hdrs=parseCSV(lines[0]).map(h=>h.replace(/"/g,'').replace(/^\uFEFF/,'').trim());
-    if(!hdrs.some(h=>h==='그룹'||h==='이름'||h==='기도제목'))return null;
+    if(!hdrs.some(h=>h==='그룹'||h==='이름'))return null;
     const imp=[];
     for(let i=1;i<lines.length;i++){
       if(!lines[i].trim())continue;
       const cols=parseCSV(lines[i]).map(c=>c.replace(/"/g,'').trim());
       const obj={};hdrs.forEach((h,idx)=>{obj[h]=cols[idx]||'';});
       const grp=gNms().find(g=>g===obj['그룹'])||gNms().find(g=>obj['그룹']&&obj['그룹'].includes(g))||'기타';
-      imp.push({id:uid(),group:grp,affiliation:obj['소속']||'',name:obj['이름']||'이름없음',subject:obj['기도제목']||'',date:obj['날짜']||tod(),prayDates:[],items:[obj['항목1']||'',obj['항목2']||'',obj['항목3']||'',obj['항목4']||'',obj['항목5']||''],status:['미응답','진행중','응답됨'].includes(obj['상태'])?obj['상태']:'미응답',responseDate:obj['응답날짜']||'',responseMemo:obj['응답내용']||''});
+      imp.push({id:uid(),group:grp,affiliation:obj['소속']||'',name:obj['이름']||'이름없음',subject:'',date:obj['날짜']||tod(),prayDates:[],items:[obj['항목1']||'',obj['항목2']||'',obj['항목3']||'',obj['항목4']||'',obj['항목5']||''],status:['미응답','진행중','응답됨'].includes(obj['상태'])?obj['상태']:'미응답',responseDate:obj['응답날짜']||'',responseMemo:obj['응답내용']||''});
     }
     return imp;
   }
   function doImp(text){
     const imp=tryP(text);
-    if(!imp){alert('헤더 인식 실패. 첫 줄: 그룹,소속,이름,기도제목,날짜,상태,항목1,항목2,항목3,항목4,항목5,응답날짜,응답내용');return;}
+    if(!imp){alert('헤더 인식 실패. 첫 줄: 그룹,소속,이름,날짜,상태,항목1~5,응답날짜,응답내용');return;}
     if(!imp.length){alert('불러온 데이터가 없습니다');return;}
     prayers=[...imp,...prayers];sv();closeImp();goto('home');
     setTimeout(()=>toast('✅ '+imp.length+'개 기도제목을 불러왔습니다'),150);
