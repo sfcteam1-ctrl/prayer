@@ -765,13 +765,13 @@ function rGEdit(){
   const allSelected = gp.length > 0 && gp.every(p=>geSelected.has(p.id));
   const selCount = geSelected.size;
 
-  // 상단 툴바
+  // 상단 툴바 — onclick 직접 호출 (이벤트 버블링 의존 안 함)
   const toolbar = '<div class="ge-toolbar">'
-    +'<button class="ge-sel-all '+(allSelected?'on':'')+'" id="btn-selall">'
+    +'<button class="ge-sel-all '+(allSelected?'on':'')+'" onclick="geToggleSelAll()">'
     +(allSelected?'☑ 전체 해제':'☐ 전체 선택')
     +'</button>'
     +(selCount>0
-      ? '<button class="ge-del-sel" id="btn-delsel">🗑️ 선택 삭제 ('+selCount+'개)</button>'
+      ? '<button class="ge-del-sel" onclick="geDelSelected()">🗑️ 선택 삭제 ('+selCount+'개)</button>'
       : '<div class="ge-tip-inline">▲▼ 또는 길게 눌러 순서 변경</div>'
     )
     +'</div>';
@@ -841,6 +841,20 @@ function rGEdit(){
   el.addEventListener('touchmove', _geTmMv, {passive:false});
 }
 
+/* 툴바 버튼 — 전역 함수 (onclick 직접 호출) */
+function geToggleSelAll(){
+  const gp = prayers.filter(p=>p.group===cg);
+  const allSel = gp.every(p=>geSelected.has(p.id));
+  if(allSel) gp.forEach(p=>geSelected.delete(p.id));
+  else       gp.forEach(p=>geSelected.add(p.id));
+  rGEdit();
+}
+
+function geDelSelected(){
+  const gp = prayers.filter(p=>p.group===cg);
+  delSelected(gp);
+}
+
 function toggleSelAll(gp){
   const allSel = gp.every(p=>geSelected.has(p.id));
   if(allSel) gp.forEach(p=>geSelected.delete(p.id));
@@ -859,10 +873,7 @@ function delSelected(gp){
 }
 
 function geEditClick(e){
-  // 툴바 버튼
-  const selAll = e.target.closest('.ge-sel-all');
-  const delSel = e.target.closest('.ge-del-sel');
-  // 개별 항목 버튼
+  // 개별 항목 버튼만 처리 (툴바는 onclick 직접 호출)
   const chk    = e.target.closest('.ge-chk');
   const upBtn  = e.target.closest('.ge-up');
   const dnBtn  = e.target.closest('.ge-dn');
@@ -870,14 +881,6 @@ function geEditClick(e){
   const delBtn = e.target.closest('.ge-del');
   const mid    = e.target.closest('.ge-mid');
 
-  if(selAll){
-    const gp=prayers.filter(p=>p.group===cg);
-    toggleSelAll(gp); return;
-  }
-  if(delSel){
-    const gp=prayers.filter(p=>p.group===cg);
-    delSelected(gp); return;
-  }
   if(chk){
     const id=chk.dataset.id;
     if(geSelected.has(id)) geSelected.delete(id); else geSelected.add(id);
