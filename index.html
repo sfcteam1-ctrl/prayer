@@ -1443,13 +1443,7 @@ window.addEventListener('popstate', e => {
 <script>
 if('serviceWorker'in navigator){
   window.addEventListener('load',()=>{
-    const c=['const CACHE="pnb-v5";',
-      'self.addEventListener("install",e=>self.skipWaiting());',
-      'self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});',
-      'self.addEventListener("fetch",e=>{if(e.request.method!=="GET")return;e.respondWith(caches.open(CACHE).then(c=>c.match(e.request).then(r=>r||fetch(e.request))));});'
-    ].join('\n');
-    try{const b=new Blob([c],{type:'application/javascript'});navigator.serviceWorker.register(URL.createObjectURL(b)).catch(()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
-    catch{navigator.serviceWorker.register('./sw.js').catch(()=>{});}
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
   });
 }
 let dp;
