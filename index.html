@@ -233,6 +233,15 @@ body{font-family:var(--sans);background:#e5e7eb;color:var(--g900);min-height:100
 .ib-install{background:#fff;color:#1e1b4b;border:none;padding:8px 13px;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
 .ib-x{background:rgba(255,255,255,.15);border:none;color:#fff;padding:8px;border-radius:8px;cursor:pointer;font-size:16px}
 .rcnt{font-size:12px;color:var(--g400);margin-bottom:9px;font-weight:500}
+/* 파일 연동 */
+.sync-box{background:linear-gradient(135deg,#eef2ff,#e0e7ff);border:1.5px solid #c7d2fe;border-radius:16px;padding:16px;margin-bottom:14px}
+.sync-title{font-family:var(--serif);font-size:15px;font-weight:700;color:var(--ink);margin-bottom:8px}
+.sync-status{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--g600)}
+.sync-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.sync-dot.on{background:#16a34a;box-shadow:0 0 6px rgba(22,163,74,.5)}
+.sync-dot.off{background:var(--g400)}
+.sync-guide{font-size:11px;color:#4338ca;margin-top:9px;line-height:1.6}
+.sh-div{height:1px;background:var(--g200);margin:14px 0}
 .cnt-badge{font-size:11px;color:var(--v);font-weight:700;background:#eef2ff;padding:3px 8px;border-radius:8px}
 .ghdr-sel-btn{font-size:11px;font-weight:700;padding:5px 11px;border-radius:20px;border:none;cursor:pointer;font-family:var(--sans)}
 </style>
@@ -408,17 +417,37 @@ body{font-family:var(--sans);background:#e5e7eb;color:var(--g900);min-height:100
   <div class="sheet" onclick="event.stopPropagation()">
     <div class="sh-hnd"></div>
     <div class="sh-ttl">📂 데이터 관리</div>
+
+    <!-- 파일 직접 연동 섹션 -->
+    <div class="sync-box" id="sync-box">
+      <div class="sync-title">📁 기기 파일 직접 연동</div>
+      <div class="sync-status" id="sync-status">
+        <span class="sync-dot off"></span>
+        <span id="sync-status-txt">연결된 파일 없음</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-p" style="margin:0;flex:1;padding:11px 8px;font-size:13px" onclick="linkFile()">📂 파일 열기·연결</button>
+        <button class="btn btn-s" style="margin:0;flex:1;padding:11px 8px;font-size:13px" onclick="saveToFile()" id="btn-save-file" disabled>💾 파일에 저장</button>
+      </div>
+      <div class="sync-guide">파일을 한 번 연결하면, 저장 버튼으로 기기 파일과 즉시 동기화됩니다.</div>
+    </div>
+
+    <div class="sh-div"></div>
+
+    <!-- 기존 CSV 기능 -->
     <div class="csv-guide">
       <b>📋 CSV 저장 방법</b>
       <p>엑셀: 파일 저장 형식 → <u>CSV UTF-8(쉼표로 분리)</u><br>구글시트: 파일 → 다운로드 → 쉼표로 구분된 값(.csv)<br><br>그룹명: 등록된 그룹명과 정확히 일치해야 합니다<br>상태: 미응답 / 진행중 / 응답됨</p>
     </div>
-    <button class="btn btn-s" onclick="dlTemplate()">📋 양식 파일 다운로드</button>
-    <button class="btn btn-p" onclick="document.getElementById('file-in').click()">📁 CSV 파일 불러오기</button>
-    <button class="btn btn-s" onclick="exportAll()">📤 전체 내보내기 (백업)</button>
+    <button class="btn btn-s" onclick="dlTemplate()">📋 CSV 양식 다운로드</button>
+    <button class="btn btn-p" onclick="document.getElementById('file-in').click()">📁 CSV 불러오기</button>
+    <button class="btn btn-s" onclick="exportAll()">📤 CSV 전체 내보내기</button>
+    <button class="btn btn-s" onclick="exportJSON()">📦 JSON 전체 내보내기</button>
     <button class="btn btn-s" onclick="closeImp()">닫기</button>
   </div>
 </div>
 <input type="file" id="file-in" accept=".csv,.txt" style="display:none">
+<input type="file" id="file-json-in" accept=".json" style="display:none">
 
 <!-- GROUP MODAL -->
 <div id="gm-modal" class="overlay" style="display:none" onclick="closeGM(event)">
@@ -504,17 +533,14 @@ function toast(m){const e=document.getElementById('toast-el');e.textContent=m;e.
 let cs='home',cg=null,cid=null,fromEdit=false,cf='전체',cdi=0,hv='group',plist=[],pidx=0,psrc='group';
 
 function goto(sc){
-  const prevSc=cs;
   document.querySelectorAll('.screen,.psel-sc,.pray-sc,.pdone-sc').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.nb').forEach(e=>e.classList.remove('on'));
   const el=document.getElementById('s-'+sc);if(el)el.classList.add('active');
   const nb=document.getElementById('nav-'+sc);if(nb)nb.classList.add('on');
-  cs=sc;
-  // 화면이 바뀔 때만 pushState, 같은 화면 재렌더는 replaceState
-  try{
-    if(prevSc!==sc) history.pushState({sc},'',location.pathname+location.search);
-    else history.replaceState({sc},'',location.pathname+location.search);
-  }catch{}
+  const prev=cs; cs=sc;
+  // 같은 화면이면 replaceState, 다른 화면이면 pushState (스택 누적 방지)
+  try{ if(sc===prev) history.replaceState({sc},'',location.pathname+location.search);
+       else history.pushState({sc},'',location.pathname+location.search); }catch{}
   ({home:rHome,group:rGroup,groupedit:rGEdit,groupmgr:rGMgr,detail:rDetail,
     search:rSearch,archive:rArchive,praysel:rPraySel,pray:rPray,praydone:rPrayDone,
     day:rDay,dayedit:rDayEdit})[sc]?.();
@@ -1202,7 +1228,7 @@ function endPray(){goto(psrc==='day'?'day':'home');}
 function rPrayDone(){document.getElementById('pd-sub').innerHTML='총 '+plist.length+'개의 기도제목을 위해<br>기도해 주셔서 감사합니다.<br>하나님께서 들으셨습니다!';}
 
 /* ── CSV ── */
-function openImp(){document.getElementById('imp-modal').style.display='flex';}
+function openImp(){document.getElementById('imp-modal').style.display='flex';updateSyncUI();}
 function closeImp(e){if(!e||e.target===document.getElementById('imp-modal'))document.getElementById('imp-modal').style.display='none';}
 function dlTemplate(){
   const hdr='그룹,소속,이름,날짜,상태,항목1,항목2,항목3,항목4,항목5,응답날짜,응답내용';
@@ -1216,98 +1242,171 @@ function exportAll(){
   dlCSV(hdr+'\n'+rows.join('\n'),'기도수첩_백업_'+tod()+'.csv');toast('📤 내보내기 완료');
 }
 function dlCSV(c,fn){const b=new Blob(['\ufeff'+c],{type:'text/csv;charset=utf-8;'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=fn;a.click();setTimeout(()=>URL.revokeObjectURL(u),100);}
-/* parseCSV: "" 이스케이프 처리 포함 */
 function parseCSV(ln){
   const r=[];let c='',q=false,i=0;
   while(i<ln.length){
     const ch=ln[i];
-    if(q){
-      if(ch==='"'){
-        if(ln[i+1]==='"'){c+='"';i+=2;continue;}
-        q=false;
-      }else c+=ch;
-    }else{
-      if(ch==='"'){q=true;}
-      else if(ch===','){r.push(c);c='';}
-      else c+=ch;
-    }
+    if(q){if(ch==='"'){if(ln[i+1]==='"'){c+='"';i+=2;continue;}q=false;}else c+=ch;}
+    else{if(ch==='"'){q=true;}else if(ch===','){r.push(c);c='';}else c+=ch;}
     i++;
   }
   r.push(c);return r;
 }
-
-/* 날짜 정규화: YYYY-MM-DD / YYYY.MM.DD / YYYY/MM/DD */
-function normDate(d){
-  if(!d||!d.trim())return'';
-  const m=d.trim().replace(/[.\/]/g,'-').match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if(!m)return'';
-  return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
-}
-
 document.getElementById('file-in').onchange=function(){
   const file=this.files[0];if(!file)return;
-  this.value='';
-
   function tryP(text){
-    const clean=text.replace(/^\uFEFF/,'');
-    const lines=clean.trim().split(/\r?\n/);
-    if(!lines.length)return null;
+    const clean=text.replace(/^\uFEFF/,'');const lines=clean.trim().split(/\r?\n/);
     const hdrs=parseCSV(lines[0]).map(h=>h.replace(/"/g,'').replace(/^\uFEFF/,'').trim());
     if(!hdrs.some(h=>h==='그룹'||h==='이름'))return null;
     const imp=[];
     for(let i=1;i<lines.length;i++){
       if(!lines[i].trim())continue;
-      const cols=parseCSV(lines[i]);
-      const obj={};hdrs.forEach((h,idx)=>{obj[h]=(cols[idx]||'').replace(/"/g,'').trim();});
-      if(!obj['이름'])continue;
-      const grp=gNms().find(g=>g===obj['그룹'])
-        ||gNms().find(g=>obj['그룹']&&obj['그룹'].includes(g))
-        ||'기타';
-      const items=[obj['항목1']||'',obj['항목2']||'',obj['항목3']||'',obj['항목4']||'',obj['항목5']||''];
-      imp.push({
-        id:uid(),group:grp,
-        affiliation:obj['소속']||'',
-        name:obj['이름'],
-        subject:items.find(Boolean)||obj['이름']||'',
-        date:normDate(obj['날짜'])||tod(),
-        prayDates:[],items,
-        status:['미응답','진행중','응답됨'].includes(obj['상태'])?obj['상태']:'미응답',
-        responseDate:normDate(obj['응답날짜'])||'',
-        responseMemo:obj['응답내용']||''
-      });
+      const cols=parseCSV(lines[i]).map(c=>c.replace(/"/g,'').trim());
+      const obj={};hdrs.forEach((h,idx)=>{obj[h]=cols[idx]||'';});
+      const grp=gNms().find(g=>g===obj['그룹'])||gNms().find(g=>obj['그룹']&&obj['그룹'].includes(g))||'기타';
+      imp.push({id:uid(),group:grp,affiliation:obj['소속']||'',name:obj['이름']||'이름없음',subject:obj['항목1']||'',date:obj['날짜']||tod(),prayDates:[],items:[obj['항목1']||'',obj['항목2']||'',obj['항목3']||'',obj['항목4']||'',obj['항목5']||''],status:['미응답','진행중','응답됨'].includes(obj['상태'])?obj['상태']:'미응답',responseDate:obj['응답날짜']||'',responseMemo:obj['응답내용']||''});
     }
     return imp;
   }
-
   function doImp(text){
     const imp=tryP(text);
-    if(imp===null){
-      alert('CSV 헤더를 인식할 수 없습니다.\n\n✅ 필수 컬럼: 그룹, 이름\n✅ 첫 줄 예시:\n그룹,소속,이름,날짜,상태,항목1,항목2,항목3,항목4,항목5,응답날짜,응답내용\n\n💡 엑셀: "CSV UTF-8(쉼표로 분리)" 형식으로 저장\n💡 구글시트: 파일→다운로드→CSV');
-      return;
-    }
-    if(!imp.length){alert('불러온 데이터가 없습니다.\n이름 컬럼이 모두 비어있는지 확인해주세요.');return;}
+    if(!imp){alert('헤더 인식 실패. 첫 줄: 그룹,소속,이름,날짜,상태,항목1~5,응답날짜,응답내용');return;}
+    if(!imp.length){alert('불러온 데이터가 없습니다');return;}
     prayers=[...imp,...prayers];sv();closeImp();goto('home');
     setTimeout(()=>toast('✅ '+imp.length+'개 기도제목을 불러왔습니다'),150);
   }
-
-  // UTF-8 시도 → 헤더 인식 실패 시 EUC-KR 재시도
   const r1=new FileReader();
-  r1.onerror=()=>alert('파일을 읽을 수 없습니다. 파일이 손상됐거나 접근이 거부됐습니다.');
   r1.onload=ev=>{
-    const txt=ev.target.result;
-    if(tryP(txt)!==null){doImp(txt);return;}
-    const r2=new FileReader();
-    r2.onerror=()=>doImp(txt);
-    r2.onload=ev2=>{
-      if(tryP(ev2.target.result)!==null){doImp(ev2.target.result);return;}
-      doImp(txt);
-    };
-    r2.readAsText(file,'EUC-KR');
+    const txt=ev.target.result.replace(/^\uFEFF/,'');
+    if(txt.includes('그룹')||txt.includes('이름')||txt.includes('기도')){doImp(txt);}
+    else{const r2=new FileReader();r2.onload=ev2=>doImp(ev2.target.result);r2.readAsText(file,'EUC-KR');}
   };
-  r1.readAsText(file,'UTF-8');
+  r1.readAsText(file,'UTF-8');this.value='';
 };
 
-/* ── 초기화 ── */
+/* ═══════════════════════════════════════
+   기기 파일 직접 연동
+═══════════════════════════════════════ */
+let fileHandle = null;   // 연결된 FileSystemFileHandle
+const SK_FN = 'pnb_fname_v1'; // 연결된 파일명 저장 (표시용)
+
+function buildExportData(){
+  return {version:2, exported:new Date().toISOString(),
+          prayers, groups, weekly, cnts};
+}
+
+function updateSyncUI(){
+  const dot  = document.getElementById('sync-status') ? document.querySelector('.sync-dot') : null;
+  const txt  = document.getElementById('sync-status-txt');
+  const btn  = document.getElementById('btn-save-file');
+  const fn   = localStorage.getItem(SK_FN)||'';
+  if(dot)  dot.className  = 'sync-dot '+(fileHandle?'on':'off');
+  if(txt)  txt.textContent = fileHandle ? '연결됨: '+fn : '연결된 파일 없음';
+  if(btn)  btn.disabled   = !fileHandle;
+}
+
+async function verifyPermission(handle){
+  try{
+    const opt={mode:'readwrite'};
+    if((await handle.queryPermission(opt))==='granted') return true;
+    if((await handle.requestPermission(opt))==='granted') return true;
+  }catch{}
+  return false;
+}
+
+// 파일 열기 & 연결 (File System Access API 지원 시)
+async function linkFile(){
+  // File System Access API 지원 여부
+  if(window.showOpenFilePicker){
+    try{
+      const [handle] = await window.showOpenFilePicker({
+        types:[{description:'기도수첩 데이터',accept:{'application/json':['.json']}}],
+        multiple:false
+      });
+      fileHandle = handle;
+      localStorage.setItem(SK_FN, handle.name);
+
+      // 파일 읽기 & 데이터 로드
+      const file = await handle.getFile();
+      const text = await file.text();
+      try{ loadFromJSON(text); }catch(e){ toast('데이터 파싱 오류: '+e.message); return; }
+      updateSyncUI();
+      closeImp();
+      goto('home');
+      setTimeout(()=>toast('✅ 파일 연결 완료 · 데이터를 불러왔습니다'),150);
+    }catch(e){
+      if(e.name!=='AbortError') toast('파일 열기 실패: '+e.message);
+    }
+  } else {
+    // 폴백: 일반 file input
+    document.getElementById('file-json-in').click();
+  }
+}
+
+// 연결된 파일에 저장
+async function saveToFile(){
+  const json = JSON.stringify(buildExportData(), null, 2);
+
+  if(fileHandle){
+    const ok = await verifyPermission(fileHandle);
+    if(ok){
+      try{
+        const w = await fileHandle.createWritable();
+        await w.write(json);
+        await w.close();
+        toast('💾 파일에 저장되었습니다');
+        return;
+      }catch(e){
+        toast('저장 오류: '+e.message);
+        return;
+      }
+    } else {
+      toast('파일 쓰기 권한이 필요합니다. 다시 연결해주세요.');
+      fileHandle = null; updateSyncUI(); return;
+    }
+  }
+  toast('먼저 파일을 연결해주세요');
+}
+
+// File System Access API 없는 환경 (JSON import)
+document.getElementById('file-json-in').onchange = function(){
+  const file = this.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try{
+      loadFromJSON(ev.target.result);
+      closeImp(); goto('home');
+      setTimeout(()=>toast('✅ JSON 데이터를 불러왔습니다'),150);
+    }catch(e){ alert('파일 형식 오류: '+e.message); }
+  };
+  reader.readAsText(file,'UTF-8');
+  this.value='';
+};
+
+function loadFromJSON(text){
+  const d = JSON.parse(text);
+  if(d.prayers && Array.isArray(d.prayers)){ prayers = d.prayers; sv(); }
+  if(d.groups  && Array.isArray(d.groups)) { groups  = d.groups;  svG(); }
+  if(d.weekly  && Array.isArray(d.weekly)) {
+    if(d.weekly.length===6) weekly = d.weekly;
+    svW();
+  }
+  if(d.cnts && typeof d.cnts==='object'){ cnts = d.cnts; svC(); }
+}
+
+// JSON 전체 내보내기 (다운로드)
+function exportJSON(){
+  const json = JSON.stringify(buildExportData(), null, 2);
+  const blob = new Blob([json],{type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url; a.download='기도수첩_'+tod()+'.json'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),100);
+  toast('📦 JSON 파일로 내보냈습니다');
+}
+
+// 앱 시작 시 동기화 UI 업데이트
+updateSyncUI();
 // 초기 히스토리 상태 (뒤로가기 인터셉트용 베이스)
 try{ history.replaceState({sc:'home'}, '', location.pathname+location.search); }catch{}
 goto('home');
